@@ -110,5 +110,8 @@ The farm will receive all data and commands from the display wall head node. And
 
 ### TODO:
 
-    - [ ] Compressed/Decompress all TCOP connections
+    - [x] Compressed/Decompress all TCOP connections
     - [ ] Fix basel compensation code
+    - [ ] Create single window client
+    - [ ] Implement multiple render farm deployment
+    - [ ] Implement window manager in the client side
