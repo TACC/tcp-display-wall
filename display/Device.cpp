@@ -22,7 +22,7 @@
  */
 
 #include "Device.h"
-#include <modules/dw/display/work/OSPWork.h>
+#include <display/work/OSPWork.h>
 #include <mpi/MPOffloadWorker.h>
 #include <mpi/common/setup.h>
 #include "ospcommon/utility/getEnvVar.h"

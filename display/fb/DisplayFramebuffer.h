@@ -147,7 +147,7 @@ namespace ospray {
 
         std::mutex tilesDone_mutex;
 
-        std::set<vec2i> tilesDone;
+        std::set<vec2i> tilesMissing;
       };
 
       template <>

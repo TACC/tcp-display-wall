@@ -23,7 +23,7 @@
 #include "OSPWork.h"
 #include <display/fb/DisplayFramebuffer.h>
 #include <display/glDisplay/glDisplay.h>
-#include <modules/dw/display/Device.h>
+#include <display/Device.h>
 #include <mpi/fb/DistributedFrameBuffer.h>
 
 ospray::dw::display::SetTile::SetTile(ospray::ObjectHandle &handle,

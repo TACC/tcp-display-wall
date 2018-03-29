@@ -104,16 +104,16 @@ ospray::dw::display::DisplayFramebuffer::~DisplayFramebuffer()
 
 bool ospray::dw::display::DisplayFramebuffer::isFrameReady()
 {
-  std::lock_guard<std::mutex> ll(tilesDone_mutex);
-  return (getTotalTiles() == tilesDone.size());
+//  std::lock_guard<std::mutex> ll(tilesDone_mutex);
+  return (tilesMissing.empty());
 }
 
 bool ospray::dw::display::DisplayFramebuffer::setNumTilesDone(
     const vec2i &tileDone)
 {
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
-  tilesDone.insert(tileDone);
-  bool done = (getTotalTiles() == tilesDone.size());
+  tilesMissing.erase(tileDone);
+  bool done = tilesMissing.empty();
   if (done)
     condition_done.notify_all();
   return done;
@@ -149,9 +149,8 @@ void ospray::dw::display::DisplayFramebuffer::beginFrame()
 {
   mpi::messaging::enableAsyncMessaging();
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
-  tilesDone.clear();
+  tilesMissing = tilesRequired;
   frameActive = true;
-  condition_done.notify_all();
 }
 
 float ospray::dw::display::DisplayFramebuffer::endFrame(
@@ -159,8 +158,6 @@ float ospray::dw::display::DisplayFramebuffer::endFrame(
 {
   mpi::messaging::disableAsyncMessaging();
   frameActive = false;
-  std::lock_guard<std::mutex> lock(tilesDone_mutex);
-  tilesDone.clear();
 }
 const void *ospray::dw::display::DisplayFramebuffer::mapDepthBuffer()
 {
@@ -205,7 +202,7 @@ std::set<ospcommon::vec2i> ospray::dw::display::DisplayFramebuffer::diff()
 {
   std::set<ospcommon::vec2i> d;
   for (auto p : tilesRequired) {
-    if (tilesDone.find(p) == tilesDone.end())
+    if (tilesMissing.find(p) == tilesMissing.end())
       d.insert(p);
   }
 
