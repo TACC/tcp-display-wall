@@ -1,10 +1,15 @@
-# OSPRay display wall README
+# TCP Bridged Display Wall for OSPray Readme (v0.1)
 
 This display wall module is based of the MPI Distributed module provided by the base OSPRay source code.
 
 ## Prerequisites
 
 Follow the instructions to install from source [OSPRay](https://github.com/ospray/OSPRay)
+
+Currently it dependes on a modifications of the MPI Offload module for OSPray that can be
+found here
+
+[https://github.com/jgbarbosa/ospray/tree/dw](https://github.com/jgbarbosa/ospray/tree/dw)
 
 ## Download and compile the module
 
@@ -44,7 +49,7 @@ make -j 8
  * 0 - Sorted by x coordinate first
  * 1 - Sorted by y coordinate first
  
-### Screen hosts order maching (X coordiante)
+### 3x3 Screen hosts order maching (X coordiante)
  
  |  6  |  7   |  8   |
  |:---:|:----:|:----:|
@@ -60,9 +65,9 @@ make -j 8
  mpirun -n 1 ./ospExampleViewer --osp:module:dwdisplay --osp:device:dwdisplay <Visualiztion parameter> : -n <number of display nodes> ./dwDisplay --osp:module:dwdisplay --osp:device:dwdisplay
 ```
 
-For full screen:
+To disable full screen:
 ```
- export DW_FULLSCREEN=1
+ export DW_FULLSCREEN=0
  mpirun -n 1 ./ospExampleViewer --osp:module:dwdisplay --osp:device:dwdisplay <Visualiztion parameter> : -n <number of display nodes> ./dwDisplay --osp:module:dwdisplay --osp:device:dwdisplay
 ```
 
@@ -79,4 +84,13 @@ The farm will receive all data and commands from the display wall head node. And
 ```
  mpirun -n <number of nodes> ./dwFarm -osp:module:dwdisplay --osp:device:dwdisplay 
 ```
- 
+
+### Notes:
+
+    - When compiling for large display walls use larger TILE_SIZE (cmake <other options> -DTILE_SIZE=256)
+    - Use the same compiler for the display wall cluster and rendering cluster
+
+### TODO:
+
+    - [ ] Compressed/Decompress all TCOP connections
+    - [ ] Fix basel compensation code
