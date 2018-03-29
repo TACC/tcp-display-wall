@@ -22,6 +22,7 @@
  */
 
 #include "TCPFabric.h"
+#include <snappy.h>
 
 namespace mpicommon {
 
@@ -40,7 +41,7 @@ namespace mpicommon {
   {
     ospcommon::close(connection);
   }
-
+#if 0
   size_t TCPFabric::read(void *&mem)
   {
     uint32_t sz32 = 0;
@@ -69,5 +70,44 @@ namespace mpicommon {
     ospcommon::write(connection, mem, sz32);
     ospcommon::flush(connection);
   }
+#else
+size_t TCPFabric::read(void *&mem)
+{
+  uint32_t sz32 = 0;
+  // Get the size of the bcast being sent to us. Only this part must be
+  // non-blocking, after getting the size we know everyone will enter the
+  // blocking barrier and the blocking bcast where the buffer is sent out.
+  ospcommon::read(connection, &sz32, sizeof(uint32_t));
+  // TODO: Maybe at some point we should dump the buffer if it gets really
+  // large
+  char* compressed = new char[sz32];
+  ospcommon::read(connection, compressed, sz32);
+  size_t usize;
+  snappy::GetUncompressedLength(compressed,sz32,&usize);
+  buffer.resize(usize);
+  mem = buffer.data();
+  snappy::RawUncompress(compressed,sz32,(char*)mem);
+  delete [] compressed;
+  return usize;
+}
 
+void TCPFabric::send(void *mem, size_t size)
+{
+  assert(size < (1LL << 30));
+  uint32_t sz32 = size;
+  char* compressedbuf = new char[snappy::MaxCompressedLength(sz32)];
+  size_t compressed_size;
+  snappy::RawCompress((char*)mem,sz32,compressedbuf,&compressed_size);
+  // Send the size of the bcast we're sending. Only this part must be
+  // non-blocking, after getting the size we know everyone will enter the
+  // blocking barrier and the blocking bcast where the buffer is sent out.
+  ospcommon::write(connection, &compressed_size, sizeof(uint32_t));
+  // Now do non-blocking test to see when this bcast is satisfied to avoid
+  // locking out the send/recv threads
+  ospcommon::write(connection, compressedbuf, compressed_size);
+  ospcommon::flush(connection);
+
+  delete [] compressedbuf;
+}
+#endif
 }  // namespace mpicommon

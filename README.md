@@ -4,12 +4,30 @@ This display wall module is based of the MPI Distributed module provided by the 
 
 ## Prerequisites
 
+#### OSPRay
+
 Follow the instructions to install from source [OSPRay](https://github.com/ospray/OSPRay)
 
 Currently it dependes on a modifications of the MPI Offload module for OSPray that can be
 found here
 
 [https://github.com/jgbarbosa/ospray/tree/dw](https://github.com/jgbarbosa/ospray/tree/dw)
+
+#### Google SNAPPY Compression
+
+The display wall TCP connection depends on Google SNAPPY compression algorithm to compress/uncompress the data stream between
+the display and the farm.
+
+Google implementation can be found [here https://github.com/google/snappy](https://github.com/google/snappy)
+
+```
+git clone https://github.com/google/snappy.git
+cd snappy
+mkdir build;cd build
+cmake .. -DCMAKE_INSTALL_PREIX=<install path>
+make -j8; make install
+export SNAPPY_HOME=<install path>
+```
 
 ## Download and compile the module
 
