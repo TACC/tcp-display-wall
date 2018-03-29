@@ -80,34 +80,34 @@ size_t TCPFabric::read(void *&mem)
   ospcommon::read(connection, &sz32, sizeof(uint32_t));
   // TODO: Maybe at some point we should dump the buffer if it gets really
   // large
-  char* compressed = new char[sz32];
-  ospcommon::read(connection, compressed, sz32);
-  size_t usize;
-  snappy::GetUncompressedLength(compressed,sz32,&usize);
-  buffer.resize(usize);
+  char* compressed_data_block = new char[sz32];
+  ospcommon::read(connection, compressed_data_block, sz32);
+  size_t compressed_data_size;
+  snappy::GetUncompressedLength(compressed_data_block,sz32,&compressed_data_size);
+  buffer.resize(compressed_data_size);
   mem = buffer.data();
-  snappy::RawUncompress(compressed,sz32,(char*)mem);
-  delete [] compressed;
-  return usize;
+  snappy::RawUncompress(compressed_data_block,sz32,(char*)mem);
+  delete [] compressed_data_block;
+  return compressed_data_size;
 }
 
 void TCPFabric::send(void *mem, size_t size)
 {
   assert(size < (1LL << 30));
   uint32_t sz32 = size;
-  char* compressedbuf = new char[snappy::MaxCompressedLength(sz32)];
-  size_t compressed_size;
-  snappy::RawCompress((char*)mem,sz32,compressedbuf,&compressed_size);
+  char* compressed_data_block = new char[snappy::MaxCompressedLength(sz32)];
+  size_t compressed_data_size;
+  snappy::RawCompress((char*)mem,sz32,compressed_data_block,&compressed_data_size);
   // Send the size of the bcast we're sending. Only this part must be
   // non-blocking, after getting the size we know everyone will enter the
   // blocking barrier and the blocking bcast where the buffer is sent out.
-  ospcommon::write(connection, &compressed_size, sizeof(uint32_t));
+  ospcommon::write(connection, &compressed_data_size, sizeof(uint32_t));
   // Now do non-blocking test to see when this bcast is satisfied to avoid
   // locking out the send/recv threads
-  ospcommon::write(connection, compressedbuf, compressed_size);
+  ospcommon::write(connection, compressed_data_block, compressed_data_size);
   ospcommon::flush(connection);
 
-  delete [] compressedbuf;
+  delete [] compressed_data_block;
 }
 #endif
 }  // namespace mpicommon

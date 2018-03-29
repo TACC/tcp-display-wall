@@ -138,7 +138,8 @@ namespace ospray {
         std::mutex done;
         std::condition_variable condition_done;
         void *colorBuffer = nullptr;
-        bool frameActive{false};
+        std::atomic<bool> frameActive{false};
+        std::atomic<bool> frameeDone{false};
         vec2f ratio;
         vec2i pos;
         vec2i completeScreen;
@@ -148,6 +149,7 @@ namespace ospray {
         std::mutex tilesDone_mutex;
 
         std::set<vec2i> tilesMissing;
+
       };
 
       template <>

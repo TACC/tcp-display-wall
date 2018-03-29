@@ -104,8 +104,7 @@ ospray::dw::display::DisplayFramebuffer::~DisplayFramebuffer()
 
 bool ospray::dw::display::DisplayFramebuffer::isFrameReady()
 {
-//  std::lock_guard<std::mutex> ll(tilesDone_mutex);
-  return (tilesMissing.empty());
+  return (frameeDone);
 }
 
 bool ospray::dw::display::DisplayFramebuffer::setNumTilesDone(
@@ -113,10 +112,10 @@ bool ospray::dw::display::DisplayFramebuffer::setNumTilesDone(
 {
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
   tilesMissing.erase(tileDone);
-  bool done = tilesMissing.empty();
-  if (done)
+  frameeDone = tilesMissing.empty();
+  if (frameeDone)
     condition_done.notify_all();
-  return done;
+  return frameeDone;
 }
 
 void ospray::dw::display::DisplayFramebuffer::waitUntilFrameDone()
@@ -147,6 +146,7 @@ void ospray::dw::display::DisplayFramebuffer::incoming(
 
 void ospray::dw::display::DisplayFramebuffer::beginFrame()
 {
+  frameeDone = false;
   mpi::messaging::enableAsyncMessaging();
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
   tilesMissing = tilesRequired;
