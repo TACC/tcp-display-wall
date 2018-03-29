@@ -146,6 +146,7 @@ namespace ospray {
           attachTexture(prev);
         }
         splatTextureOnScreen();
+        glfwPollEvents();
       } while (true);
     }
 

@@ -1,4 +1,4 @@
-# TCP Bridged Display Wall for OSPray Readme (v0.1)
+# TCP Bridged Display Wall for OSPray Readme (v0.2)
 
 This display wall module is based of the MPI Distributed module provided by the base OSPRay source code.
 
