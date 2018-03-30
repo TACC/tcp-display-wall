@@ -1,4 +1,4 @@
-# TCP Bridged Display Wall for OSPray Readme (v0.2)
+# TCP Bridged Display Wall for OSPray Readme (v0.3)
 
 This display wall module is based of the MPI Distributed module provided by the base OSPRay source code.
 
@@ -110,8 +110,11 @@ The farm will receive all data and commands from the display wall head node. And
 
 ### TODO:
 
-    - [x] Compressed/Decompress all TCOP connections
-    - [ ] Fix basel compensation code
+    - [x] Compressed/Decompress all TCP connections
+        - [x] Using GOOGLE Snappy algorithm
+        - [ ] Using bz2 library
+        - [ ] Find alternative
+    - [x] Fix basel compensation code
     - [ ] Create single window client
     - [ ] Implement multiple render farm deployment
     - [ ] Implement window manager in the client side
