@@ -30,6 +30,10 @@
 namespace ospray {
   namespace dw {
 
+      inline int tileID(const ospcommon::vec2i& max,const ospcommon::vec2i& tile) {
+        return (tile.y * max.x) + tile.x;
+      }
+
     wallconfig::wallconfig() : viewerSize(0, 0), viewerNode(false)
     {
       sync();
@@ -77,15 +81,21 @@ namespace ospray {
                               basel_compensation.y * (displayConfig.y - 1);
           viewerSize = localScreen;
 
+          maxTiles = ospcommon::divRoundUp(completeScreeen,ospcommon::vec2i(TILE_SIZE));
+
+
           for (int y = 0; y < completeScreeen.y; y += TILE_SIZE)
             for (int x = 0; x < completeScreeen.x; x += TILE_SIZE) {
-              TileRankMap[vec2i(x, y)] = std::set<int>();
-              TileRankMap[vec2i(x, y)].insert(whichRank(vec2i(x, y)));
-              TileRankMap[vec2i(x, y)].insert(
+
+              int ID = tileID(maxTiles,vec2i(x,y));
+
+              TileRankMap[ID] = std::set<int>();
+              TileRankMap[ID].insert(whichRank(vec2i(x, y)));
+              TileRankMap[ID].insert(
                   whichRank(vec2i(x, y + TILE_SIZE)));
-              TileRankMap[vec2i(x, y)].insert(
+              TileRankMap[ID].insert(
                   whichRank(vec2i(x + TILE_SIZE, y)));
-              TileRankMap[vec2i(x, y)].insert(
+              TileRankMap[ID].insert(
                   whichRank(vec2i(x + TILE_SIZE, y + TILE_SIZE)));
             }
 
@@ -164,18 +174,28 @@ namespace ospray {
     int wallconfig::whichRank(const vec2i &pos)
     {
       int x = std::min((int)std::floor(float(pos.x) /
-                                       (localScreen.x + basel_compensation.x)),
-                       displayConfig.x - 1);
+                                       (localScreen.x + (basel_compensation.x /2))),
+                       displayConfig.x-1);
       int y = std::min((int)std::floor(float(pos.y) /
-                                       (localScreen.y + basel_compensation.y)),
-                       displayConfig.y - 1);
+                                       (localScreen.y + (basel_compensation.y / 2))),
+                       displayConfig.y-1);
       return displayRank(x, y);
     }
 
     std::set<int> &wallconfig::getRanks(const vec2i &pos)
     {
-      return TileRankMap[pos];
+      int ID = tileID(maxTiles,pos);
+      return TileRankMap[ID];
     }
 
   }  // namespace dw
 }  // namespace ospray
+
+/*
+ *
+ * Tile not here 4 : (4096,2560) x (1920,1080) x (3840,2160)
+ * Tile not here 1 : (4864,1280) x (1920,0) x (3840,1080)
+ * Tile not here 0 : (6912,256) x (1920,0) x (3840,1080)
+ *
+ *
+ */

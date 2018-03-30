@@ -21,7 +21,7 @@
    @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
  */
 #include "FarmFramebuffer.h"
-
+#include <future>
 #include <common/work/DWwork.h>
 
 static std::atomic<int> count{0};
@@ -42,21 +42,22 @@ ospray::dw::farm::DistributedFrameBuffer::DistributedFrameBuffer(
                                      hasVarianceBuffer,
                                      masterIsAWorker)
 {
+
+  std::cout << "Buffer size" << size << std::endl;
+
 }
 ospray::dw::farm::DistributedFrameBuffer::~DistributedFrameBuffer() {}
 
 void ospray::dw::farm::DistributedFrameBuffer::scheduleProcessing(
     const std::shared_ptr<mpicommon::Message> &message)
 {
+  std::future<void> t = std::async([&] {
+        SetTile tile(myId, message->size, message->data);
+        auto device = std::dynamic_pointer_cast<ospray::dw::farm::Device>(
+                ospray::api::Device::current);
+        assert(device);
+
+        device->sendWorkDisplayWall(tile, true);
+  });
   ospray::DistributedFrameBuffer::scheduleProcessing(message);
-
-  // auto *msg = (ospray::TileMessage *)message->data;
-
-  SetTile tile(myId, message->size, message->data);
-
-  auto device = std::dynamic_pointer_cast<ospray::dw::farm::Device>(
-      ospray::api::Device::current);
-  assert(device);
-
-  device->sendWorkDisplayWall(tile, true);
 }

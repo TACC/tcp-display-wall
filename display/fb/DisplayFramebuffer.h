@@ -131,7 +131,7 @@ namespace ospray {
 
         void createTiles();
 
-        std::set<vec2i> diff();
+        std::set<int> diff();
 
        protected:
         std::atomic<size_t> numTilesDone{0};
@@ -144,11 +144,13 @@ namespace ospray {
         vec2i pos;
         vec2i completeScreen;
 
-        std::set<vec2i> tilesRequired;
+        std::set<int> tilesRequired;
 
         std::mutex tilesDone_mutex;
 
-        std::set<vec2i> tilesMissing;
+        std::set<int> tilesMissing;
+
+        vec2i maxTiles;
 
       };
 

@@ -94,8 +94,8 @@ namespace ospray {
         glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
         glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-        wsize.x = mode->width;
-        wsize.y = mode->height;
+        wsize.x = 1920; //mode->width;
+        wsize.y = 1080; //mode->height;
       }
       window =
           glfwCreateWindow(wsize.x,

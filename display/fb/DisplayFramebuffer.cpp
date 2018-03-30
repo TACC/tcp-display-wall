@@ -48,6 +48,10 @@ bool inline tileBelongsTo(const ospcommon::vec2i &tpos,
   return test;
 }
 
+inline int tileID(const ospcommon::vec2i& max,const ospcommon::vec2i& tile) {
+  return (tile.y * max.x) + tile.x;
+}
+
 ospray::dw::display::DisplayFramebuffer::DisplayFramebuffer(
     ObjectHandle &handle,
     const ospcommon::vec2i &size,
@@ -84,15 +88,15 @@ ospray::dw::display::DisplayFramebuffer::DisplayFramebuffer(
     break;
   }
 
-  int aa = 0;
+  maxTiles = ospcommon::divRoundUp(completeScreen,ospcommon::vec2i(TILE_SIZE));
+
   for (int y = 0; y < completeScreen.y; y += TILE_SIZE) {
     for (int x = 0; x < completeScreen.x; x += TILE_SIZE) {
       vec2i p(x, y);
-
       if (mpicommon::IamTheMaster())
-        tilesRequired.insert(p);
+        tilesRequired.insert(tileID(maxTiles,p));
       else if (tileBelongsTo(p, vec2i(TILE_SIZE), pos, size))
-        tilesRequired.insert(p);
+        tilesRequired.insert(tileID(maxTiles,p));
     }
   }
 }
@@ -111,10 +115,13 @@ bool ospray::dw::display::DisplayFramebuffer::setNumTilesDone(
     const vec2i &tileDone)
 {
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
-  tilesMissing.erase(tileDone);
+  if(tilesMissing.find(tileID(maxTiles,tileDone)) != tilesMissing.end()) {
+      tilesMissing.erase(tileID(maxTiles, tileDone));
+  }
   frameeDone = tilesMissing.empty();
-  if (frameeDone)
-    condition_done.notify_all();
+  if (frameeDone) {
+      condition_done.notify_all();
+  }
   return frameeDone;
 }
 
@@ -142,6 +149,7 @@ void ospray::dw::display::DisplayFramebuffer::incoming(
     accum((TilePixels<OSP_FB_NONE> *)tile);
     break;
   }
+
 }
 
 void ospray::dw::display::DisplayFramebuffer::beginFrame()
@@ -198,13 +206,7 @@ int ospray::dw::display::DisplayFramebuffer::getTotalTiles() const
   return tilesRequired.size();
 }
 
-std::set<ospcommon::vec2i> ospray::dw::display::DisplayFramebuffer::diff()
+std::set<int> ospray::dw::display::DisplayFramebuffer::diff()
 {
-  std::set<ospcommon::vec2i> d;
-  for (auto p : tilesRequired) {
-    if (tilesMissing.find(p) == tilesMissing.end())
-      d.insert(p);
-  }
-
-  return d;
+  return tilesMissing;
 }

@@ -47,7 +47,7 @@ namespace ospray {
       vec2i localScreen;
       vec2i localPosition;
       vec2i screenID;
-
+      vec2i maxTiles;
       vec2i viewerSize;
       bool viewerNode;
 

@@ -15,6 +15,6 @@ ELSE ()
             ospray
             ospray_mpi_common
             ospray_module_mpi
-            ${SNAPPY_STATIC_LIB}
+            ${SNAPPY_SHARED_LIB}
             )
 ENDIF ()
