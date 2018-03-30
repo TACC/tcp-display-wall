@@ -106,6 +106,11 @@ namespace ospray {
                                 whichRanks(screensPos,vec2i(x,y));
                         }
 
+                    std::cout << "Display configuration:" << std::endl;
+                    std::cout << "   Total display size:" << completeScreeen << std::endl;
+                    std::cout << "           Basel size:" << basel_compensation << std::endl;
+                    std::cout << "     Each screen size:" << localScreen << std::endl;
+
                 } else {
                     throw "Unable to open file : " + filename;
                 }
