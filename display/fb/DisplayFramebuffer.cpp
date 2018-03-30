@@ -138,6 +138,11 @@ void ospray::dw::display::DisplayFramebuffer::incoming(
     ;
   auto tile = (TileData *)message->data;
 
+  if(tilesRequired.find(tileID(maxTiles,tile->coords)) == tilesRequired.end()) {
+      std::cout << "[" << mpicommon::worker.rank << " ] " << tile->coords << " x " << pos  << " : " << (pos + size)  << " : " << tilesMissing.size() << std::endl;
+      return;
+  }
+
   switch (tile->type) {
   case OSP_FB_RGBA8:
     accum((TilePixels<OSP_FB_RGBA8> *)tile);

@@ -30,41 +30,35 @@
 #include <set>
 
 namespace ospray {
-  namespace dw {
+    namespace dw {
 
-    using namespace ospcommon;
+        using namespace ospcommon;
 
-    struct wallconfig : public ManagedObject
-    {
-      ~wallconfig() = default;
-      wallconfig();
+        struct wallconfig : public ManagedObject {
+            ~wallconfig() = default;
+            wallconfig();
+            void sync();
+            std::set<int> &getRanks(const vec2i &pos);
 
-      void sync();
-      vec2i displayConfig;
-      vec2i basel_compensation;
-      int orientation;
-      vec2i completeScreeen;
-      vec2i localScreen;
-      vec2i localPosition;
-      vec2i screenID;
-      vec2i maxTiles;
-      vec2i viewerSize;
-      bool viewerNode;
+            vec2i displayConfig;
+            vec2i basel_compensation;
+            int orientation;
+            vec2i completeScreeen;
+            vec2i localScreen;
+            vec2i localPosition;
+            vec2i screenID;
+            vec2i maxTiles;
 
-      int displayRank(const int &x, const int &y);
-      int whichRank(const vec2i &pos);
-      std::set<int> &getRanks(const vec2i &pos);
+        protected:
+            std::map<vec2i, std::set<int>> TileRankMap;
+//            std::vector<vec2i> screensPos;
+//            std::vector<int> screensIDs;
 
-      vec2i getLocalScreenSize() const
-      {
-        if (viewerNode)
-          return viewerSize;
-        return localScreen;
-      }
-
-      std::map<vec2i, std::set<int>> TileRankMap;
-    };
-  }  // namespace dw
+            int displayRank(const int &x, const int &y);
+        private:
+            void whichRanks(std::vector<vec2i> &screensPos, const vec2i &pos);
+        };
+    }  // namespace dw
 }  // namespace ospray
 
 #endif  // OSPRAY_WALLCONFIG_H

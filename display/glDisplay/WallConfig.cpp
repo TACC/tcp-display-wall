@@ -28,167 +28,135 @@
 #include "ospcommon/utility/getEnvVar.h"
 
 namespace ospray {
-  namespace dw {
+    namespace dw {
+        template <typename T>
+        bool inline inRange(const T &x, const T &lower, const T &upper)
+        {
+            return (x >= lower && x < upper);
+        }
 
-      inline int tileID(const ospcommon::vec2i& max,const ospcommon::vec2i& tile) {
-        return (tile.y * max.x) + tile.x;
-      }
+        template <typename T>
+        T inline minInRange(const T &x, const T &lower, const T &upper)
+        {
+            return std::min(std::max(x, lower), upper);
+        }
 
-    wallconfig::wallconfig() : viewerSize(0, 0), viewerNode(false)
-    {
-      sync();
-    }
-
-    void wallconfig::sync()
-    {
-      if (mpicommon::IamTheMaster()) {
-        auto envfilename = utility::getEnvVar<std::string>("DW_CONFIG_FILE");
-        auto filename    = envfilename.value_or("default.conf");
-
-        std::ifstream conffile(filename, std::ios::in);
-        if (conffile.is_open()) {
-          conffile >> localScreen.x >> localScreen.y;
-          conffile >> displayConfig.x >> displayConfig.y;
-          conffile >> basel_compensation.x >> basel_compensation.y;
-          conffile >> orientation;
-
-          // Send data to all workers
-          MPI_CALL(Bcast(
-              this, sizeof(wallconfig), MPI_BYTE, 0, mpicommon::world.comm));
-
-          localPosition = vec2i(0, 0);
-
-          vec2i aa(0, 0);
-
-          MPI_CALL(Reduce(&aa.x,
-                          &localScreen.x,
-                          1,
-                          MPI_INT,
-                          MPI_MAX,
-                          0,
-                          mpicommon::world.comm));
-          MPI_CALL(Reduce(&aa.y,
-                          &localScreen.y,
-                          1,
-                          MPI_INT,
-                          MPI_MAX,
-                          0,
-                          mpicommon::world.comm));
-
-          completeScreeen.x = localScreen.x * displayConfig.x +
-                              basel_compensation.x * (displayConfig.x - 1);
-          completeScreeen.y = localScreen.y * displayConfig.y +
-                              basel_compensation.y * (displayConfig.y - 1);
-          viewerSize = localScreen;
-
-          maxTiles = ospcommon::divRoundUp(completeScreeen,ospcommon::vec2i(TILE_SIZE));
+        bool inline tileBelongsTo(const ospcommon::vec2i &tpos,
+                                  const ospcommon::vec2i &tsize,
+                                  const ospcommon::vec2i &dpos,
+                                  const ospcommon::vec2i &dsize)
+        {
+            bool test = inRange<int>(tpos.x, dpos.x, dpos.x + dsize.x) ||
+                        inRange(dpos.x, tpos.x, tpos.x + tsize.x);
+            test &= inRange<int>(tpos.y, dpos.y, dpos.y + dsize.y) ||
+                    inRange(dpos.y, tpos.y, tpos.y + tsize.y);
+            return test;
+        }
 
 
-          for (int y = 0; y < completeScreeen.y; y += TILE_SIZE)
-            for (int x = 0; x < completeScreeen.x; x += TILE_SIZE) {
+        inline int tileID(const ospcommon::vec2i &max, const ospcommon::vec2i &tile) {
+            return (tile.y * max.x) + tile.x;
+        }
 
-              int ID = tileID(maxTiles,vec2i(x,y));
+        wallconfig::wallconfig() {
+            sync();
+        }
 
-              TileRankMap[ID] = std::set<int>();
-              TileRankMap[ID].insert(whichRank(vec2i(x, y)));
-              TileRankMap[ID].insert(
-                  whichRank(vec2i(x, y + TILE_SIZE)));
-              TileRankMap[ID].insert(
-                  whichRank(vec2i(x + TILE_SIZE, y)));
-              TileRankMap[ID].insert(
-                  whichRank(vec2i(x + TILE_SIZE, y + TILE_SIZE)));
+        void wallconfig::sync() {
+            if (mpicommon::IamTheMaster()) {
+                auto envfilename = utility::getEnvVar<std::string>("DW_CONFIG_FILE");
+                auto filename = envfilename.value_or("default.conf");
+
+                std::ifstream conffile(filename, std::ios::in);
+                if (conffile.is_open()) {
+                    conffile >> localScreen.x >> localScreen.y;
+                    conffile >> displayConfig.x >> displayConfig.y;
+                    conffile >> basel_compensation.x >> basel_compensation.y;
+                    conffile >> orientation;
+
+                    // Send data to all workers
+                    MPI_CALL(Bcast(
+                            this, sizeof(wallconfig), MPI_BYTE, 0, mpicommon::world.comm));
+
+                    completeScreeen.x = localScreen.x * displayConfig.x +
+                                        basel_compensation.x * (displayConfig.x - 1);
+                    completeScreeen.y = localScreen.y * displayConfig.y +
+                                        basel_compensation.y * (displayConfig.y - 1);
+
+                    maxTiles = ospcommon::divRoundUp(completeScreeen, ospcommon::vec2i(TILE_SIZE));
+
+                    std::vector<vec2i> screensPos;
+
+                    int ID =0;
+                    if (orientation == 0)
+                        for (int y = 0; y < completeScreeen.y; y += localScreen.y + basel_compensation.y)
+                            for (int x = 0; x < completeScreeen.x; x += localScreen.x + basel_compensation.x) {
+                                screensPos.push_back(vec2i(x, y));
+                            }
+                    else
+                        for (int x = 0; x < completeScreeen.x; x += localScreen.x + basel_compensation.x) {
+                            for (int y = 0; y < completeScreeen.y; y += localScreen.x + basel_compensation.y)
+                                screensPos.push_back(vec2i(x, y));
+                            }
+
+
+
+                    for (int y = 0; y < completeScreeen.y; y += TILE_SIZE)
+                        for (int x = 0; x < completeScreeen.x; x += TILE_SIZE) {
+                                whichRanks(screensPos,vec2i(x,y));
+                        }
+
+                } else {
+                    throw "Unable to open file : " + filename;
+                }
+            } else {
+                // Send data to all workers
+                MPI_CALL(Bcast(
+                        this, sizeof(wallconfig), MPI_BYTE, 0, mpicommon::world.comm));
+
+
+                dw::glDisplay::setScreen(localScreen);
+
+
+                int x = (orientation == 0) ? (mpicommon::worker.rank % displayConfig.x)
+                                           : (mpicommon::worker.rank / displayConfig.x);
+                int y = (orientation == 0) ? (mpicommon::worker.rank / displayConfig.x)
+                                           : (mpicommon::worker.rank % displayConfig.y);
+
+                screenID = vec2i(x, y);
+
+                localPosition.x = localScreen.x * x + basel_compensation.x * x;
+                localPosition.y = localScreen.y * y + basel_compensation.y * y;
+
+                completeScreeen.x = localScreen.x * displayConfig.x +
+                                    basel_compensation.x * (displayConfig.x - 1);
+                completeScreeen.y = localScreen.y * displayConfig.y +
+                                    basel_compensation.y * (displayConfig.y - 1);
+
             }
-
-        } else {
-          throw "Unable to open file : " + filename;
         }
-      } else {
-        // Send data to all workers
-        MPI_CALL(Bcast(
-            this, sizeof(wallconfig), MPI_BYTE, 0, mpicommon::world.comm));
-        localScreen = dw::glDisplay::getWindowSize();
 
-        // localScreen = vec2i(512,769);
-
-        int x = (orientation == 0) ? (mpicommon::worker.rank % displayConfig.x)
-                                   : (mpicommon::worker.rank / displayConfig.x);
-        int y = (orientation == 0) ? (mpicommon::worker.rank / displayConfig.x)
-                                   : (mpicommon::worker.rank % displayConfig.y);
-
-        screenID = vec2i(x, displayConfig.y - y);
-
-        vec2i localBasel(0, 0);
-        if (x > 0 && y < displayConfig.x)
-          localBasel.x = basel_compensation.x * x;
-        if (y > 0 && y < displayConfig.y)
-          localBasel.y = basel_compensation.y * x;
-
-        localPosition.x = localScreen.x * x + localBasel.x;
-        localPosition.y = localScreen.y * y + localBasel.y;
-
-        MPI_CALL(Reduce(&localScreen.x,
-                        &localScreen.x,
-                        1,
-                        MPI_INT,
-                        MPI_MAX,
-                        0,
-                        mpicommon::world.comm));
-        MPI_CALL(Reduce(&localScreen.y,
-                        &localScreen.y,
-                        1,
-                        MPI_INT,
-                        MPI_MAX,
-                        0,
-                        mpicommon::world.comm));
-
-        completeScreeen.x = localScreen.x * displayConfig.x +
-                            basel_compensation.x * (displayConfig.x - 1);
-        completeScreeen.y = localScreen.y * displayConfig.y +
-                            basel_compensation.y * (displayConfig.y - 1);
-        viewerSize = localScreen;
-      }
-
-      for (int i = 0; i < mpicommon::world.size; i++) {
-        if (mpicommon::world.rank == i) {
-          std::cout << "[" << mpicommon::world.rank
-                    << "] Configuration: " << std::endl;
-          std::cout << "         Display config : " << displayConfig
-                    << std::endl;
-          std::cout << "         Global screen size : " << completeScreeen
-                    << std::endl;
-          std::cout << "         Local position : " << localPosition
-                    << std::endl;
-          std::cout << "         Local screen size : " << localScreen
-                    << std::endl;
+        int wallconfig::displayRank(const int &x, const int &y) {
+            return (orientation == 0) ? (x + y * displayConfig.x)
+                                      : (y + x * displayConfig.y);
         }
-        mpicommon::world.barrier();
-      }
-    }
 
-    int wallconfig::displayRank(const int &x, const int &y)
-    {
-      return (orientation == 0) ? (x + y * displayConfig.x)
-                                : (y + x * displayConfig.y);
-    }
+        void wallconfig::whichRanks(std::vector<vec2i> &screensPos,const vec2i &pos) {
+            auto ID = tileID(maxTiles,pos);
+            TileRankMap[ID] = std::set<int>();
+            for(int i = 0; i < screensPos.size(); i++) {
+                if(tileBelongsTo(pos,vec2i(TILE_SIZE), screensPos[i], localScreen)) {
+                    TileRankMap[ID].insert(i);
+                }
+            }
+        }
 
-    int wallconfig::whichRank(const vec2i &pos)
-    {
-      int x = std::min((int)std::floor(float(pos.x) /
-                                       (localScreen.x + (basel_compensation.x /2))),
-                       displayConfig.x-1);
-      int y = std::min((int)std::floor(float(pos.y) /
-                                       (localScreen.y + (basel_compensation.y / 2))),
-                       displayConfig.y-1);
-      return displayRank(x, y);
-    }
+        std::set<int> &wallconfig::getRanks(const vec2i &pos) {
+            int ID = tileID(maxTiles, pos);
+            return TileRankMap[ID];
+        }
 
-    std::set<int> &wallconfig::getRanks(const vec2i &pos)
-    {
-      int ID = tileID(maxTiles,pos);
-      return TileRankMap[ID];
-    }
-
-  }  // namespace dw
+    }  // namespace dw
 }  // namespace ospray
 
 /*

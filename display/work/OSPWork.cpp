@@ -53,8 +53,11 @@ void ospray::dw::display::SetTile::runOnMaster() {
         auto MT8 = (MasterTileMessage_RGBA_I8 *) msg;
         display::TilePixels<OSP_FB_RGBA8> tile(MT8->coords, (byte_t *) MT8->color);
         dfb->accum(&tile);
-        for (auto w : device->wc->getRanks(tile.coords))
+        for (auto w : device->wc->getRanks(tile.coords)) {
             sendToWorker(w, &tile, sizeof(tile));
+        }
+
+
     } else if (msg->command & MASTER_WRITE_TILE_F32) {
         auto MT32 = (MasterTileMessage_RGBA_F32 *) msg;
         display::TilePixels<OSP_FB_RGBA32F> tile(MT32->coords,
@@ -65,6 +68,7 @@ void ospray::dw::display::SetTile::runOnMaster() {
     } else {
         throw std::runtime_error("Got an unexpected message");
     }
+
 }
 
 ospray::dw::display::CreateFrameBuffer::CreateFrameBuffer(
@@ -151,7 +155,6 @@ void ospray::dw::display::RenderFrame::runOnMaster() {
     assert(device);
     auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
     dfb->beginFrame();
-
     while (!dfb->isFrameReady()) {
         auto work = device->readWork();
         auto tag = typeIdOf(work);

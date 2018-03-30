@@ -32,72 +32,83 @@
 #include <display/fb/DisplayFramebuffer.h>
 
 namespace ospray {
-  namespace dw {
+    namespace dw {
 
-    struct glDisplay
-    {
-      // Static display manipulation
-      //
+        struct glDisplay {
+            // Static display manipulation
+            //
 
-      // There can only be one instance
-      static std::shared_ptr<glDisplay> instance;
+            // There can only be one instance
+            static std::shared_ptr<glDisplay> instance;
 
-      /*  ! Initialize screen
-       *
-       *
-       */
-      static void init(const vec2i &size);
-      /*  ! Initialize screen
-       *
-       *
-       */
-      static void start(const vec2i &screenID);
+            /*  ! Initialize screen
+             *
+             *
+             */
+            static void init(const vec2i &size);
 
-      /* Is screen initializwd
-       *
-       *
-       */
-      static bool initialized();
+            /*  ! Initialize screen
+             *
+             *
+             */
+            static void setScreen(const vec2i &size);
 
-      /* Load new frame result into texture
-       *
-       *
-       */
-      static void loadFrame(const byte_t *map, const vec2i &size);
+            /*  ! Initialize screen
+             *
+             *
+             */
+            static void start(const vec2i &screenID);
 
-      static vec2i getWindowSize();
+            /* Is screen initializwd
+             *
+             *
+             */
+            static bool initialized();
 
-      glDisplay();
-      virtual ~glDisplay();
+            /* Load new frame result into texture
+             *
+             *
+             */
+            static void loadFrame(const byte_t *map, const vec2i &size);
 
-      void splatTextureOnScreen();
-      void attachTexture(const int &b);
-      void renderLoop(const vec2i &screenID);
-      void loadImage(const byte_t *map, const vec2i &size);
-      void initialize(const vec2i &size);
+            static vec2i getWindowSize();
 
-     protected:
-      void initTexture();
+            glDisplay();
 
-      GLuint texture[2];
-      int current_texture;
-      GLFWwindow *window = nullptr;
+            virtual ~glDisplay();
 
-      std::mutex m;
+            void splatTextureOnScreen();
 
-      bool _initialized = false;
+            void attachTexture(const int &b);
 
-      int prev;
+            void renderLoop(const vec2i &screenID);
 
-      std::vector<byte_t> buffers[2];
-      vec2i sizes[2];
+            void loadImage(const byte_t *map, const vec2i &size);
 
-      vec2i windowSize;
-      vec2i screenID;
+            void initialize(const vec2i &size);
 
-      mpicommon::Group displaygroup;
-    };
-  }  // namespace dw
+        protected:
+            void initTexture();
+
+            GLuint texture[2];
+            int current_texture;
+            GLFWwindow *window = nullptr;
+
+            std::mutex m;
+
+            bool _initialized = false;
+
+            int prev;
+
+            std::vector<byte_t> buffers[2];
+            vec2i sizes[2];
+
+            vec2i windowSize;
+            vec2i screenID;
+
+            mpicommon::Group displaygroup;
+        };
+    }  // namespace dw
 }  // namespace ospray
 
 #endif  // OSPRAY_GLDISPLAY_H
