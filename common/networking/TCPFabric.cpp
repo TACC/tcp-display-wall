@@ -26,9 +26,11 @@
 #include <snappy.h>
 #elif defined(DW_USE_DENSITY)
 #include <density_api.h>
+constexpr uint_fast64_t lion_packet_size = 768*768;
 #else
 
 #endif
+
 
 namespace mpicommon {
 
@@ -130,9 +132,9 @@ namespace mpicommon {
         outCompressed, compress_size, (uint8_t *)mem, decompress_safe_size);
 
     if (result.state != DENSITY_STATE_OK) {
-      printf("[Decompression] Decompression %llu bytes to %llu bytes\n",
+      printf("[Decompression] Decompression %llu bytes to %llu bytes %i\n",
              result.bytesRead,
-             result.bytesWritten);
+             result.bytesWritten, result.state);
       throw std::runtime_error("Error compressing data");
     }
 
@@ -146,13 +148,18 @@ namespace mpicommon {
     uint_fast64_t sz32               = size;
     uint_fast64_t compress_safe_size = density_compress_safe_size(sz32);
 
+    DENSITY_ALGORITHM compression = DENSITY_ALGORITHM_LION;
+    if(compress_safe_size >= lion_packet_size) {
+      compression = DENSITY_ALGORITHM_CHEETAH;
+    }
+
     byte_t *outCompressed = new byte_t[compress_safe_size];
     density_processing_result result;
     result = density_compress((uint8_t *)mem,
                               sz32,
                               outCompressed,
                               compress_safe_size,
-                              DENSITY_ALGORITHM_LION);
+                              compression);
 
     if (result.state != DENSITY_STATE_OK) {
       printf("[Compression] Compression %llu bytes to %llu bytes\n",
@@ -168,7 +175,7 @@ namespace mpicommon {
     ospcommon::write(connection, &sz32, sizeof(uint_fast64_t));
     ospcommon::write(connection, &result.bytesWritten, sizeof(uint_fast64_t));
     ospcommon::write(connection, outCompressed, result.bytesWritten);
-    std::cout << "Sent : " << result.bytesWritten << " of " << result.bytesRead << std::endl;
+    std::cout << "Sent : " << result.bytesWritten << " of " << result.bytesRead << " size " << sz32 << "state " << result.state << std::endl;
     ospcommon::flush(connection);
     delete[] outCompressed;
   }
