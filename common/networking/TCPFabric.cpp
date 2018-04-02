@@ -175,7 +175,6 @@ namespace mpicommon {
     ospcommon::write(connection, &sz32, sizeof(uint_fast64_t));
     ospcommon::write(connection, &result.bytesWritten, sizeof(uint_fast64_t));
     ospcommon::write(connection, outCompressed, result.bytesWritten);
-    std::cout << "Sent : " << result.bytesWritten << " of " << result.bytesRead << " size " << sz32 << "state " << result.state << std::endl;
     ospcommon::flush(connection);
     delete[] outCompressed;
   }
