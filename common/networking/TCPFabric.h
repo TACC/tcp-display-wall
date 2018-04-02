@@ -59,6 +59,10 @@ namespace mpicommon {
     int port;
     ospcommon::socket_t connection;
 
+    std::atomic<float> aa;
+    std::atomic<int> aa_count;
+
+
     bool server;
   };
 }  // namespace mpicommon

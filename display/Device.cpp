@@ -107,6 +107,7 @@ void ospray::dw::display::Device::commit()
 
     tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
     tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
+    std::cout << "Farm connected" << std::endl;
   }
 
   auto OSPRAY_DYNAMIC_LOADBALANCER =
@@ -125,8 +126,6 @@ void ospray::dw::display::Device::commit()
       ObjectHandle(), useDynamicLoadBalancer, preAllocatedTiles);
 
   processWork(slbWork);
-
-  std::cout << "Farm connected" << std::endl;
 }
 
 void ospray::dw::display::Device::processWork(mpi::work::Work &work,
