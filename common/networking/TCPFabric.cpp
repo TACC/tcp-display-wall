@@ -45,8 +45,6 @@ namespace mpicommon {
 
   TCPFabric::~TCPFabric()
   {
-    std::cout << "Avg. : " << (aa/aa_count) << std::endl;
-
     ospcommon::close(connection);
   }
 #if defined(DW_USE_SNAPPY)
@@ -123,11 +121,14 @@ namespace mpicommon {
     ospcommon::read(connection, outCompressed, compress_size);
 
     uint_fast64_t decompress_safe_size = density_decompress_safe_size(sz32);
+
     buffer.resize(decompress_safe_size);
     mem = buffer.data();
+
     density_processing_result result;
     result = density_decompress(
         outCompressed, compress_size, (uint8_t *)mem, decompress_safe_size);
+
     if (result.state != DENSITY_STATE_OK) {
       printf("[Decompression] Decompression %llu bytes to %llu bytes\n",
              result.bytesRead,
@@ -154,6 +155,9 @@ namespace mpicommon {
                               DENSITY_ALGORITHM_LION);
 
     if (result.state != DENSITY_STATE_OK) {
+      printf("[Compression] Compression %llu bytes to %llu bytes\n",
+             result.bytesRead,
+             result.bytesWritten);
       uint_fast64_t size_flag = sz32 | (1LL << 63);
       ospcommon::write(connection, &size_flag, sizeof(uint_fast64_t));
       ospcommon::write(connection, mem, sz32);
@@ -164,6 +168,7 @@ namespace mpicommon {
     ospcommon::write(connection, &sz32, sizeof(uint_fast64_t));
     ospcommon::write(connection, &result.bytesWritten, sizeof(uint_fast64_t));
     ospcommon::write(connection, outCompressed, result.bytesWritten);
+    std::cout << "Sent : " << result.bytesWritten << " of " << result.bytesRead << std::endl;
     ospcommon::flush(connection);
     delete[] outCompressed;
   }
