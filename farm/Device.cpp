@@ -132,8 +132,7 @@ void ospray::dw::farm::Device::commit()
 
     exit = (tag == typeIdOf<mpi::work::CommandFinalize>());
     processWork(*work, true);
-
-    std::cout << "Finished " << typeString(work) << std::endl;
+    postStatusMsg(OSPRAY_MPI_VERBOSE_LEVEL) << "Finished " << typeString(work);
   }
 }
 
