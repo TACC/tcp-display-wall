@@ -21,147 +21,191 @@
    @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
  */
 #include "OSPWork.h"
+#include <display/Device.h>
 #include <display/fb/DisplayFramebuffer.h>
 #include <display/glDisplay/glDisplay.h>
-#include <display/Device.h>
 #include <mpi/fb/DistributedFrameBuffer.h>
 #include <future>
+
+static std::atomic<size_t> add;
 
 ospray::dw::display::SetTile::SetTile(ospray::ObjectHandle &handle,
                                       const ospray::uint64 &size,
                                       const ospcommon::byte_t *msg)
-        : ospray::dw::SetTile(handle, size, msg) {
+    : ospray::dw::SetTile(handle, size, msg)
+{
 }
 
 void ospray::dw::display::SetTile::run() {}
 
 void ospray::dw::display::SetTile::sendToWorker(size_t worker,
                                                 void *msg,
-                                                size_t size) {
-    std::shared_ptr<maml::Message> msgsend =
-            std::make_shared<maml::Message>(msg, size);
-    mpi::messaging::sendTo(
-            mpicommon::globalRankFromWorkerRank(worker), fbHandle, msgsend);
+                                                size_t size)
+{
+  std::shared_ptr<maml::Message> msgsend =
+      std::make_shared<maml::Message>(msg, size);
+  mpi::messaging::sendTo(
+      mpicommon::globalRankFromWorkerRank(worker), fbHandle, msgsend);
 }
 
-void ospray::dw::display::SetTile::runOnMaster() {
-    auto device =
-            std::dynamic_pointer_cast<display::Device>(api::Device::current);
-    auto dfb = dynamic_cast<dw::display::DisplayFramebuffer *>(fbHandle.lookup());
-    auto *msg = (ospray::TileMessage *) data;
-    if (msg->command & MASTER_WRITE_TILE_I8) {
-        auto MT8 = (MasterTileMessage_RGBA_I8 *) msg;
-        display::TilePixels<OSP_FB_RGBA8> tile(MT8->coords, (byte_t *) MT8->color);
-        dfb->accum(&tile);
-        for (auto w : device->wc->getRanks(tile.coords)) {
-            sendToWorker(w, &tile, sizeof(tile));
-        }
+void ospray::dw::display::SetTile::runOnMaster()
+{
+  auto device =
+      std::dynamic_pointer_cast<display::Device>(api::Device::current);
+  auto dfb = dynamic_cast<dw::display::DisplayFramebuffer *>(fbHandle.lookup());
+  auto *msg = (ospray::TileMessage *)data;
 
+  if (msg->command & MASTER_WRITE_TILE_I8) {
+    auto MT8 = (MasterTileMessage_RGBA_I8 *)msg;
+    display::TilePixels<OSP_FB_RGBA8> tile(MT8->coords, (byte_t *)MT8->color);
 
-    } else if (msg->command & MASTER_WRITE_TILE_F32) {
-        auto MT32 = (MasterTileMessage_RGBA_F32 *) msg;
-        display::TilePixels<OSP_FB_RGBA32F> tile(MT32->coords,
-                                                 (byte_t *) MT32->color);
-        dfb->accum(&tile);
-        for (auto w : device->wc->getRanks(tile.coords))
-            sendToWorker(w, &tile, sizeof(tile));
-    } else {
-        throw std::runtime_error("Got an unexpected message");
+    dfb->accum(&tile);
+    const auto &ranks = device->wc->getRanks(tile.coords);
+    for (auto &w : ranks) {
+      sendToWorker(w, &tile, sizeof(tile));
     }
+  } else if (msg->command & MASTER_WRITE_TILE_F32) {
+    auto MT32 = (MasterTileMessage_RGBA_F32 *)msg;
+    display::TilePixels<OSP_FB_RGBA32F> tile(MT32->coords,
+                                             (byte_t *)MT32->color);
 
+    dfb->accum(&tile);
+    const auto &ranks = device->wc->getRanks(tile.coords);
+    for (auto &w : ranks) {
+      sendToWorker(w, &tile, sizeof(tile));
+    }
+  } else {
+    throw std::runtime_error("Got an unexpected message");
+  }
 }
 
 ospray::dw::display::CreateFrameBuffer::CreateFrameBuffer(
-        ospray::ObjectHandle handle,
-        ospcommon::vec2i dimensions,
-        OSPFrameBufferFormat format,
-        ospray::uint32 channels)
-        : mpi::work::CreateFrameBuffer(handle, dimensions, format, channels) {
+    ospray::ObjectHandle handle,
+    ospcommon::vec2i dimensions,
+    OSPFrameBufferFormat format,
+    ospray::uint32 channels)
+    : mpi::work::CreateFrameBuffer(handle, dimensions, format, channels)
+{
 }
 
-void ospray::dw::display::CreateFrameBuffer::run() {
-    const bool hasDepthBuffer = channels & OSP_FB_DEPTH;
-    const bool hasAccumBuffer = channels & OSP_FB_ACCUM;
-    const bool hasVarianceBuffer = channels & OSP_FB_VARIANCE;
+void ospray::dw::display::CreateFrameBuffer::run()
+{
+  const bool hasDepthBuffer    = channels & OSP_FB_DEPTH;
+  const bool hasAccumBuffer    = channels & OSP_FB_ACCUM;
+  const bool hasVarianceBuffer = channels & OSP_FB_VARIANCE;
 
-    assert(dimensions.x > 0);
-    assert(dimensions.y > 0);
+  assert(dimensions.x > 0);
+  assert(dimensions.y > 0);
 
-    auto wc =
-            std::dynamic_pointer_cast<display::Device>(api::Device::current)->wc;
-    FrameBuffer *fb;
-    if (mpicommon::IamTheMaster()) {
-        fb = new DisplayFramebuffer(
-                handle,
-                dimensions,
-                format,
-                hasDepthBuffer,
-                hasAccumBuffer,
-                hasVarianceBuffer,
-                vec2i(0),
-                vec2f(float(dimensions.x) / wc->completeScreeen.x,
-                      float(dimensions.y) / wc->completeScreeen.y),
-                wc->completeScreeen);
-    } else {
-        fb = new DisplayFramebuffer(handle,
-                                    wc->localScreen,
-                                    format,
-                                    hasDepthBuffer,
-                                    hasAccumBuffer,
-                                    hasVarianceBuffer,
-                                    wc->localPosition,
-                                    vec2f(1.f),
-                                    wc->completeScreeen);
-    }
-    handle.assign(fb);
+  auto wc =
+      std::dynamic_pointer_cast<display::Device>(api::Device::current)->wc;
+  FrameBuffer *fb;
+  if (mpicommon::IamTheMaster()) {
+    fb = new DisplayFramebuffer(
+        handle,
+        dimensions,
+        format,
+        hasDepthBuffer,
+        hasAccumBuffer,
+        hasVarianceBuffer,
+        vec2i(0),
+        vec2f(float(dimensions.x) / wc->completeScreeen.x,
+              float(dimensions.y) / wc->completeScreeen.y),
+        wc->completeScreeen);
+  } else {
+    fb = new DisplayFramebuffer(handle,
+                                wc->localScreen,
+                                format,
+                                hasDepthBuffer,
+                                hasAccumBuffer,
+                                hasVarianceBuffer,
+                                wc->localPosition,
+                                vec2f(1.f),
+                                wc->completeScreeen);
+  }
+  handle.assign(fb);
 }
 
-void ospray::dw::display::CreateFrameBuffer::runOnMaster() {
-    run();
+void ospray::dw::display::CreateFrameBuffer::runOnMaster()
+{
+  run();
 }
 
 void ospray::dw::display::registerOSPWorkItems(
-        mpi::work::WorkTypeRegistry &registry) {
-    mpi::work::registerOSPWorkItems(registry);
-    // Register common work
-    mpi::work::registerWorkUnit<dw::display::SetTile>(registry);
-    // Create a different buffer (instead of writing the buffer just forward)
-    mpi::work::registerWorkUnit<dw::display::CreateFrameBuffer>(registry);
-    // Local Definitions
-    mpi::work::registerWorkUnit<dw::display::RenderFrame>(registry);
+    mpi::work::WorkTypeRegistry &registry)
+{
+  mpi::work::registerOSPWorkItems(registry);
+  // Register common work
+  mpi::work::registerWorkUnit<dw::display::SetTile>(registry);
+  // Create a different buffer (instead of writing the buffer just forward)
+  mpi::work::registerWorkUnit<dw::display::CreateFrameBuffer>(registry);
+  // Local Definitions
+  mpi::work::registerWorkUnit<dw::display::RenderFrame>(registry);
 }
 
 ospray::dw::display::RenderFrame::RenderFrame(OSPFrameBuffer fb,
                                               OSPRenderer renderer,
                                               ospray::uint32 channels)
-        : mpi::work::RenderFrame(fb, renderer, channels) {
+    : mpi::work::RenderFrame(fb, renderer, channels)
+{
 }
 
-void ospray::dw::display::RenderFrame::run() {
-    auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
-    dfb->beginFrame();
-    dfb->waitUntilFrameDone();
-    dfb->endFrame(inf);
-    byte_t *color = (byte_t *) dfb->mapColorBuffer();
-    mpicommon::worker.barrier();
-    dw::glDisplay::loadFrame(color, dfb->size);
-    mpicommon::world.barrier();
-    dfb->unmap(color);
+void ospray::dw::display::RenderFrame::run()
+{
+  auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
+  dfb->beginFrame();
+  dfb->waitUntilFrameDone();
+  dfb->endFrame(inf);
+  byte_t *color = (byte_t *)dfb->mapColorBuffer();
+  mpicommon::worker.barrier();
+  dw::glDisplay::loadFrame(color, dfb->size);
+  mpicommon::world.barrier();
+  dfb->unmap(color);
 }
 
-void ospray::dw::display::RenderFrame::runOnMaster() {
-    auto device =
-            std::dynamic_pointer_cast<dw::display::Device>(api::Device::current);
-    assert(device);
-    auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
-    dfb->beginFrame();
-    while (!dfb->isFrameReady()) {
-        auto work = device->readWork();
-        auto tag = typeIdOf(work);
-        if (tag != typeIdOf<dw::display::SetTile>())
-            throw std::runtime_error("Somthing went wrong it can only be a tile");
-        work->runOnMaster();
-    }
-    dfb->endFrame(inf);
-    mpicommon::world.barrier();
+void ospray::dw::display::RenderFrame::runOnMaster()
+{
+  auto device =
+      std::dynamic_pointer_cast<dw::display::Device>(api::Device::current);
+  assert(device);
+//  std::chrono::high_resolution_clock::time_point tstart_frame =
+//    std::chrono::high_resolution_clock::now();
+  auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
+  dfb->beginFrame();
+//  std::chrono::high_resolution_clock::time_point tstart_master_frame =
+//    std::chrono::high_resolution_clock::now();
+  while (!dfb->isFrameReady()) {
+    auto work = device->readWork();
+    auto tag  = typeIdOf(work);
+    if (tag != typeIdOf<dw::display::SetTile>())
+      throw std::runtime_error("Somthing went wrong it can only be a tile");
+    work->runOnMaster();
+  }
+//  std::chrono::high_resolution_clock::time_point tend_master_frame =
+//    std::chrono::high_resolution_clock::now();
+  dfb->endFrame(inf);
+
+
+
+  mpicommon::world.barrier();
+//  std::chrono::high_resolution_clock::time_point tend_frame =
+//    std::chrono::high_resolution_clock::now();
+//
+//  auto frame_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+//    tend_frame - tstart_master_frame)
+//    .count();
+//  auto frame_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+//    tend_frame - tstart_master_frame)
+//    .count();
+//
+//  auto frame_master_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+//    tend_master_frame - tstart_frame)
+//    .count();
+//  auto frame_master_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+//    tend_master_frame - tstart_frame)
+//    .count();
+//  std::cout << "Time frame : " << frame_time << "ms ("
+//            << frame_time_seconds << "s)" << " " << "Time master frame : " << frame_master_time << "ms ("
+//                                                    << frame_master_time_seconds << "s)"
+//            << std::endl;
 }

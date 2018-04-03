@@ -169,22 +169,51 @@ namespace ospray {
       {
         if (!colorBufferFormat & OSP_FB_RGBA8)
           throw std::runtime_error("Incompatible buffer formats");
-        uint32 *color  = (uint32 *)colorBuffer;
-        uint32 *pixels = (uint32 *)tile->finaltile;
+        uint32 *color = (uint32 *) colorBuffer;
+        uint32 *pixels = (uint32 *) tile->finaltile;
 
-        int count = 0;
-        tasking::parallel_for(TILE_SIZE, [&](const int iy) {
-          int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
-          if (y < 0 || y >= size.y)
-            return;
-          for (int ix = 0; ix < TILE_SIZE; ix++) {
-            int x = ((tile->coords.x + ix) - pos.x) * ratio.x;
-            if (x < 0 || x >= size.x)
+        if(mpicommon::IamAWorker()) {
+#if 1
+          tasking::parallel_for(TILE_SIZE, [&](const int iy) {
+            int y = ((tile->coords.y + iy) - pos.y);
+            if (y < 0 || y >= size.y)
+              return;
+            for (int ix = 0; ix < TILE_SIZE; ix++) {
+              int x = ((tile->coords.x + ix) - pos.x);
+              if (x < 0 || x >= size.x)
+                continue;
+              color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            }
+          });
+#else
+          for (int iy = 0; iy < TILE_SIZE; iy++) {
+            int y = ((tile->coords.y + iy) - pos.y);
+            if (y < 0 || y >= size.y)
               continue;
-            color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            int diff_lower = pos.x - tile->coords.x;
+            int ix_lower   = (diff_lower <= 0) ? 0 : diff_lower;
+            int diff_upper = std::min(ix_lower + TILE_SIZE, size.x) - ix_lower;
+            int x_lower    = std::max(pos.x, tile->coords.x);
+            std::memcpy(&color[y * size.x + x_lower],
+                        &pixels[iy * TILE_SIZE + ix_lower],
+                        diff_upper * sizeof(u_int32_t));
           }
-        });
-
+#endif
+        } else {
+          int tsize_y =  int(1 / ratio.y);
+          int tsize_x =  int(1 / ratio.x);
+          for(int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
+            int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
+            if (y < 0 || y >= size.y)
+              continue;
+            for (int ix = 0; ix < TILE_SIZE; ix += tsize_x) {
+              int x = ((tile->coords.x + ix) - pos.x) * ratio.x;
+              if (x < 0 || x >= size.x)
+                continue;
+              color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            }
+          }
+        }
         setNumTilesDone(tile->coords);
       }
 
