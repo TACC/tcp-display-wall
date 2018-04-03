@@ -167,7 +167,12 @@ namespace ospray {
       inline void DisplayFramebuffer::accum(
           ospray::dw::display::TilePixels<OSP_FB_RGBA8> *tile)
       {
-        if (!colorBufferFormat & OSP_FB_RGBA8)
+
+//          std::chrono::high_resolution_clock::time_point tstart =
+//                  std::chrono::high_resolution_clock::now();
+//
+
+          if (!colorBufferFormat & OSP_FB_RGBA8)
           throw std::runtime_error("Incompatible buffer formats");
         uint32 *color = (uint32 *) colorBuffer;
         uint32 *pixels = (uint32 *) tile->finaltile;
@@ -214,7 +219,24 @@ namespace ospray {
             }
           }
         }
-        setNumTilesDone(tile->coords);
+
+
+          setNumTilesDone(tile->coords);
+
+//          std::chrono::high_resolution_clock::time_point tend =
+//                  std::chrono::high_resolution_clock::now();
+//
+//          auto num_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+//                  tend - tstart)
+//                  .count();
+//          auto num_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+//                  tend - tstart)
+//                  .count();
+//
+//          if(mpicommon::world.rank == 5) {
+//                std::cout << "Num time :" << num_time <<"ms( " << num_time_seconds <<"s)" <<std::endl;
+//          }
+
       }
 
       template <>

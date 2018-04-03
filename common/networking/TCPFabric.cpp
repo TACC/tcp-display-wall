@@ -172,10 +172,10 @@ namespace mpicommon {
     uint_fast64_t sz32               = size;
     uint_fast64_t compress_safe_size = density_compress_safe_size(sz32);
 
-    DENSITY_ALGORITHM compression = DENSITY_ALGORITHM_LION;
-    if (compress_safe_size >= lion_packet_size) {
-      compression = DENSITY_ALGORITHM_CHEETAH;
-    }
+    DENSITY_ALGORITHM compression = DENSITY_ALGORITHM_CHEETAH;
+//    if (compress_safe_size >= lion_packet_size) {
+//      compression = DENSITY_ALGORITHM_CHEETAH;
+//    }
 
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tstart_compression =
