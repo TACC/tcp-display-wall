@@ -17,15 +17,18 @@ ELSE ()
     option(DW_USE_DENSITY OFF "Use Density algorithm")
     if(DW_USE_DENSITY)
         OPTION(DENSITY_USE_STATIC_LIBS ON "Density use static lib")
+        OPTION(DENSITY_MEASURE_TIMES OFF "Measure communication times")
         FIND_PACKAGE(DENSITY)
         include_directories(${DENSITY_INCLUDE_DIR})
         link_directories(${DENSITY_LIBRARY_DIR})
         add_definitions("-DDW_USE_DENSITY")
+        if(DENSITY_MEASURE_TIMES)
+            add_definitions("-DDENSITY_MEASURE_TIMES")
+        endif()
         set(COMPRESSION_LIB ${DENSITY_LIBRARIES})
-
-        message(STATUS ${COMPRESSION_LIB})
-
     endif()
+
+
 
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     ospray_create_library(ospray_module_dwcommon
