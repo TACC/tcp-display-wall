@@ -110,14 +110,17 @@ namespace mpicommon {
     std::chrono::high_resolution_clock::time_point tstart_read =
         std::chrono::high_resolution_clock::now();
 #endif
-    ospcommon::read(connection, &size_flag, sizeof(uint_fast64_t));
+
+    ospcommon::read(connection, &sz32, sizeof(uint_fast64_t));
     ospcommon::read(connection, &compress_size, sizeof(uint_fast64_t));
     byte_t *outCompressed = new byte_t[compress_size];
     ospcommon::read(connection, outCompressed, compress_size);
+
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tfinish_read =
         std::chrono::high_resolution_clock::now();
 #endif
+
     uint_fast64_t decompress_safe_size = density_decompress_safe_size(sz32);
     buffer.resize(decompress_safe_size);
     mem = buffer.data();
@@ -133,6 +136,7 @@ namespace mpicommon {
              result.state);
       throw std::runtime_error("Error uncompressing data");
     }
+
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tfinish_compression =
         std::chrono::high_resolution_clock::now();
@@ -157,6 +161,7 @@ namespace mpicommon {
               << decompression_time_seconds << "s) send: " << read_time
               << "ms (" << read_time_seconds << "s)" << std::endl;
 #endif
+
     delete[] outCompressed;
     return result.bytesWritten;
   }
@@ -171,10 +176,12 @@ namespace mpicommon {
     if (compress_safe_size >= lion_packet_size) {
       compression = DENSITY_ALGORITHM_CHEETAH;
     }
+
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tstart_compression =
         std::chrono::high_resolution_clock::now();
 #endif
+
     byte_t *outCompressed = new byte_t[compress_safe_size];
     density_processing_result result;
     result = density_compress(
@@ -187,14 +194,17 @@ namespace mpicommon {
       delete[] outCompressed;
       throw std::runtime_error("Error compressing data");
     }
+
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tfinish_compression =
         std::chrono::high_resolution_clock::now();
 #endif
+
     ospcommon::write(connection, &sz32, sizeof(uint_fast64_t));
     ospcommon::write(connection, &result.bytesWritten, sizeof(uint_fast64_t));
     ospcommon::write(connection, outCompressed, result.bytesWritten);
     ospcommon::flush(connection);
+
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tfinish_send =
         std::chrono::high_resolution_clock::now();
@@ -219,6 +229,7 @@ namespace mpicommon {
               << compression_time_seconds << "s) send: " << send_time << "ms ("
               << send_time_seconds << "s)" << std::endl;
 #endif
+
     delete[] outCompressed;
   }
 #else
