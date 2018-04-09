@@ -97,14 +97,18 @@ void ospray::dw::display::Device::commit()
   if (!tcp_initialized) {
     tcp_initialized = true;
 
+
     auto DW_HOSTNAME = utility::getEnvVar<std::string>("DW_HOSTNAME")
                            .value_or(std::string("localhost"));
 
     auto DW_HOSTPORT = utility::getEnvVar<int>("DW_HOSTPORT").value_or(4444);
     std::cout << "Waiting farm connection on : " << DW_HOSTNAME << ":"
               << DW_HOSTPORT << std::endl;
+
+    bool DW_TCP_BRIDGE = utility::getEnvVar<int>("DW_TCP_BRIDGE").value_or(0);
+
     tcpFabric =
-        make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, true);
+        make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, !DW_TCP_BRIDGE);
 
     tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
     tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);

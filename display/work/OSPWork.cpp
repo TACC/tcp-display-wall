@@ -194,6 +194,7 @@ void ospray::dw::display::RenderFrame::runOnMaster() {
         auto wait_time = std::chrono::duration_cast<std::chrono::microseconds>(
                 tend_waiting_for_packet - tstart_waiting_for_packet)
                 .count();
+
         auto wait_time_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
                 tend_waiting_for_packet - tstart_waiting_for_packet)
                 .count();
@@ -248,6 +249,6 @@ void ospray::dw::display::RenderFrame::runOnMaster() {
             .count();
     std::cout << "Time frame : " << frame_time << "ms ("
               << frame_time_seconds << "s)" << " " << "Time master frame : " << frame_master_time << "ms ("
-              << frame_master_time_seconds << "s) : TW " << totalM << "us total tiles : " << dfb->getTotalTiles()
+              << frame_master_time_seconds << "s) : TW " << (float(totalM)/1000) << "ms total tiles : " << dfb->getTotalTiles()
               << std::endl;
 }
