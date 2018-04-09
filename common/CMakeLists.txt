@@ -37,13 +37,14 @@ ELSE ()
         link_directories(${UDT_LIBRARY_DIR})
 #        add_definitions("-DDW_USE_UDT")
         set(COMPRESSION_LIB ${COMPRESSION_LIB} ${UDT_LIBRARIES})
+        set(UDT_SRC_FILE networking/UDTFabric.cpp)
     endif()
 
 
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     ospray_create_library(ospray_module_dwcommon
             networking/TCPFabric.cpp
-            networking/UDTFabric.cpp
+            ${UDT_SRC_FILE}
             work/DWwork.cpp
 
             LINK
