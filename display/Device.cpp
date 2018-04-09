@@ -34,6 +34,8 @@ ospray::dw::display::Device::~Device() {}
 
 void ospray::dw::display::Device::initializeDevice()
 {
+  ospray::api::Device::commit();
+
   initialized = true;
 
   display::registerOSPWorkItems(workRegistry);
@@ -80,7 +82,6 @@ void ospray::dw::display::Device::initializeDevice()
 
 void ospray::dw::display::Device::commit()
 {
-  ospray::api::Device::commit();
 
   if (!initialized) {
     initializeDevice();
