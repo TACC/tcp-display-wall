@@ -1,0 +1,74 @@
+diff --git a/udt4/CMakeLists.txt b/udt4/CMakeLists.txt
+new file mode 100644
+index 0000000..1199276
+--- /dev/null
++++ b/udt4/CMakeLists.txt
+@@ -0,0 +1,30 @@
++cmake_minimum_required(VERSION 2.8)
++
++# Set a default build type if none was specified
++set(default_build_type "Release")
++if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
++    set(default_build_type "Debug")
++endif()
++
++if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
++    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
++    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
++            STRING "Choose the type of build." FORCE)
++    # Set the possible values of build type for cmake-gui
++    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
++            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
++endif()
++
++CMAKE_POLICY(SET CMP0003 NEW) # since 2.6
++IF(POLICY CMP0015)
++    CMAKE_POLICY(SET CMP0015 NEW) # since 2.8.1
++ENDIF()
++IF(POLICY CMP0020)
++    CMAKE_POLICY(SET CMP0020 NEW) # since 2.8.11
++ENDIF()
++IF(POLICY CMP0042)
++    CMAKE_POLICY(SET CMP0042 NEW) # since 3.0
++    set(CMAKE_MACOSX_RPATH 1)
++ENDIF()
++
++add_subdirectory(src)
+\ No newline at end of file
+diff --git a/udt4/src/CMakeLists.txt b/udt4/src/CMakeLists.txt
+new file mode 100644
+index 0000000..1742683
+--- /dev/null
++++ b/udt4/src/CMakeLists.txt
+@@ -0,0 +1,31 @@
++cmake_minimum_required(VERSION 2.8)
++
++
++project(udt)
++
++OPTION(BUILD_SHARED_LIB ON "Build shared library")
++
++FILE(GLOB_RECURSE UDT_SRC_FILES *.cpp)
++FILE(GLOB_RECURSE UDT_HDR_FILES *.h)
++
++add_definitions(-DIA32)
++if(APPLE)
++    add_definitions(-DOSX)
++endif(APPLE)
++if(LINUX)
++    add_definitions(-DLINUX)
++endif(LINUX)
++
++MESSAGE(STATUS ${UDT_HDR_FILES})
++
++ADD_LIBRARY(${PROJECT_NAME}_STATIC STATIC ${UDT_SRC_FILES})
++set_target_properties(${PROJECT_NAME}_STATIC PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
++set_target_properties(${PROJECT_NAME}_STATIC PROPERTIES PUBLIC_HEADER "${UDT_HDR_FILES}")
++INSTALL(TARGETS ${PROJECT_NAME}_STATIC ARCHIVE DESTINATION lib LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include/udt4)
++
++IF(BUILD_SHARED_LIB)
++    ADD_LIBRARY(${PROJECT_NAME}_SHARED SHARED ${UDT_SRC_FILES})
++    set_target_properties(${PROJECT_NAME}_SHARED PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
++    set_target_properties(${PROJECT_NAME}_SHARED PROPERTIES PUBLIC_HEADER "${UDT_HDR_FILES}")
++    INSTALL(TARGETS ${PROJECT_NAME}_SHARED ARCHIVE DESTINATION lib LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include/udt4)
++ENDIF()

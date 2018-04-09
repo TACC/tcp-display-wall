@@ -28,11 +28,22 @@ ELSE ()
         set(COMPRESSION_LIB ${DENSITY_LIBRARIES})
     endif()
 
+#    option(DW_USE_UDT OFF "Use UDT Communication library")
+    if(DW_USE_UDT)
+        OPTION(UDT_USE_STATIC_LIBS ON "UDT use static lib")
+        FIND_PACKAGE(UDT)
+            message(STATUS "Found UDT: ${UDT_INCLUDE_DIR}")
+        include_directories(${UDT_INCLUDE_DIR})
+        link_directories(${UDT_LIBRARY_DIR})
+#        add_definitions("-DDW_USE_UDT")
+        set(COMPRESSION_LIB ${COMPRESSION_LIB} ${UDT_LIBRARIES})
+    endif()
 
 
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     ospray_create_library(ospray_module_dwcommon
             networking/TCPFabric.cpp
+            networking/UDTFabric.cpp
             work/DWwork.cpp
 
             LINK

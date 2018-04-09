@@ -42,6 +42,7 @@ ospray::dw::farm::DistributedFrameBuffer::DistributedFrameBuffer(
                                      hasVarianceBuffer,
                                      masterIsAWorker)
 {
+
 }
 ospray::dw::farm::DistributedFrameBuffer::~DistributedFrameBuffer() {}
 

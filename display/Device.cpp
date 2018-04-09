@@ -29,6 +29,7 @@
 
 #include <display/glDisplay/glDisplay.h>
 #include <farm/fb/FarmFramebuffer.h>
+#include <common/networking/UDTFabric.h>
 
 ospray::dw::display::Device::~Device() {}
 
@@ -107,9 +108,13 @@ void ospray::dw::display::Device::commit()
 
     bool DW_TCP_BRIDGE = utility::getEnvVar<int>("DW_TCP_BRIDGE").value_or(0);
 
+#ifdef DW_USE_UDT
     tcpFabric =
-        make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, !DW_TCP_BRIDGE);
-
+        make_unique<mpicommon::UDTFabric>(DW_HOSTNAME, DW_HOSTPORT, !DW_TCP_BRIDGE);
+#else
+    tcpFabric =
+      make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, !DW_TCP_BRIDGE);
+#endif
     tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
     tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
     std::cout << "Farm connected" << std::endl;
@@ -136,10 +141,12 @@ void ospray::dw::display::Device::commit()
 void ospray::dw::display::Device::processWork(mpi::work::Work &work,
                                               bool flushWriteStream)
 {
+
   auto tag = typeIdOf(work);
   tcpwriteStream->write(&tag, sizeof(tag));
   work.serialize(*tcpwriteStream);
   tcpwriteStream->flush();
+
 }
 OSPFrameBuffer ospray::dw::display::Device::frameBufferCreate(
     const ospcommon::vec2i &size,
@@ -153,11 +160,14 @@ OSPFrameBuffer ospray::dw::display::Device::frameBufferCreate(
   processWork(tcpwork);
 
   display::CreateFrameBuffer work(handle, size, mode, channels);
+
   auto tag = typeIdOf(work);
   writeStream->write(&tag, sizeof(tag));
   work.serialize(*writeStream);
   writeStream->flush();
   work.runOnMaster();
+
+
   return (OSPFrameBuffer)(int64)handle;
 }
 float ospray::dw::display::Device::renderFrame(

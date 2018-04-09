@@ -23,17 +23,26 @@
 
 #include "TCPFabric.h"
 #include <chrono>
+#include <sys/socket.h>
+#include <ospcommon/networking/Socket.h>
+#include <thread>
 
 #if defined(DW_USE_SNAPPY)
 #include <snappy.h>
 #elif defined(DW_USE_DENSITY)
 #include <density_api.h>
-constexpr uint_fast64_t lion_packet_size = 768 * 768;
+#include "OSPConfig.h"
+constexpr uint_fast64_t lion_packet_size = TILE_SIZE * TILE_SIZE * 4;
+
+static uint64_t rcount = 0;
+static uint64_t scount = 0;
+
 #else
 
 #endif
 
 namespace mpicommon {
+
 
   TCPFabric::TCPFabric(std::string hostname, int port, bool server)
       : hostname(hostname), port(port), server(server)
@@ -44,12 +53,28 @@ namespace mpicommon {
     } else {
       connection = ospcommon::connect(hostname.c_str(), port);
     }
+
+    int sndsize = 1024;
+    int& fd = *(int*)connection;
+    int err = setsockopt(fd, SOL_SOCKET, SO_SNDBUF,
+                     (char *)&sndsize, (int)sizeof(sndsize));
+
+    if(err != 0) {
+      throw std::runtime_error("Error in setting send buffer size");
+    }
+
+    err = setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
+                     (char *)&sndsize, (int)sizeof(sndsize));
+    if(err != 0) {
+      throw std::runtime_error("Error in setting send buffer size");
+    }
   }
 
   TCPFabric::~TCPFabric()
   {
     ospcommon::close(connection);
   }
+
 #if defined(DW_USE_SNAPPY)
 
   size_t TCPFabric::read(void *&mem)
@@ -138,28 +163,31 @@ namespace mpicommon {
     }
 
 #ifdef DENSITY_MEASURE_TIMES
-    std::chrono::high_resolution_clock::time_point tfinish_compression =
-        std::chrono::high_resolution_clock::now();
+    if (decompress_safe_size >= lion_packet_size) {
+      std::chrono::high_resolution_clock::time_point tfinish_compression =
+          std::chrono::high_resolution_clock::now();
 
-    auto decompression_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            tfinish_compression - tfinish_read)
-            .count();
-    auto decompression_time_seconds =
-        std::chrono::duration_cast<std::chrono::seconds>(tfinish_compression -
-                                                         tfinish_read)
-            .count();
-    auto read_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         tfinish_read - tstart_read)
-                         .count();
-    auto read_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-                                 tfinish_read - tstart_read)
-                                 .count();
-    std::cout << "Decompressiom ratio : "
-              << (float(result.bytesWritten) / result.bytesRead)  << " ";
-    std::cout << "Time decompression : " << decompression_time << "ms ("
-              << decompression_time_seconds << "s) send: " << read_time
-              << "ms (" << read_time_seconds << "s)" << std::endl;
+      auto decompression_time =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              tfinish_compression - tfinish_read)
+              .count();
+      auto decompression_time_seconds =
+          std::chrono::duration_cast<std::chrono::seconds>(tfinish_compression -
+                                                           tfinish_read)
+              .count();
+      auto read_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                           tfinish_read - tstart_read)
+                           .count();
+      auto read_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                                   tfinish_read - tstart_read)
+                                   .count();
+      std::cout << "[ " << rcount++ << " ] Decompressiom ratio : "
+                << (float(result.bytesWritten) / compress_size) << " "
+                << result.bytesWritten << " /  " << compress_size << " ";
+      std::cout << "Time decompression : " << decompression_time << "us ("
+                << decompression_time_seconds << "s) read: " << read_time
+                << "us (" << read_time_seconds << "s)" << std::endl;
+    }
 #endif
 
     delete[] outCompressed;
@@ -169,29 +197,34 @@ namespace mpicommon {
   void TCPFabric::send(void *mem, size_t size)
   {
     assert(size < (1LL << 30));
-    uint_fast64_t sz32               = size;
-    uint_fast64_t compress_safe_size = density_compress_safe_size(sz32);
+
+    msg_send msg;
+
+    msg.sz32               = size;
+    uint_fast64_t compress_safe_size = density_compress_safe_size(msg.sz32);
 
     DENSITY_ALGORITHM compression = DENSITY_ALGORITHM_CHEETAH;
-//    if (compress_safe_size >= lion_packet_size) {
-//      compression = DENSITY_ALGORITHM_CHEETAH;
-//    }
+    //    if (compress_safe_size >= lion_packet_size) {
+    //      compression = DENSITY_ALGORITHM_CHAMELEON;
+    //    }
 
 #ifdef DENSITY_MEASURE_TIMES
     std::chrono::high_resolution_clock::time_point tstart_compression =
         std::chrono::high_resolution_clock::now();
 #endif
 
-    byte_t *outCompressed = new byte_t[compress_safe_size];
+    msg.outCompressed = new byte_t[compress_safe_size];
     density_processing_result result;
     result = density_compress(
-        (uint8_t *)mem, sz32, outCompressed, compress_safe_size, compression);
+        (uint8_t *)mem, msg.sz32, msg.outCompressed, compress_safe_size, compression);
+
+    msg.bytesWritten = result.bytesWritten;
 
     if (result.state != DENSITY_STATE_OK) {
       printf("[Compression] Compression %llu bytes to %llu bytes\n",
              result.bytesRead,
              result.bytesWritten);
-      delete[] outCompressed;
+      msg.outCompressed;
       throw std::runtime_error("Error compressing data");
     }
 
@@ -200,37 +233,40 @@ namespace mpicommon {
         std::chrono::high_resolution_clock::now();
 #endif
 
-    ospcommon::write(connection, &sz32, sizeof(uint_fast64_t));
+    ospcommon::write(connection, &msg.sz32, sizeof(uint_fast64_t));
     ospcommon::write(connection, &result.bytesWritten, sizeof(uint_fast64_t));
-    ospcommon::write(connection, outCompressed, result.bytesWritten);
+    ospcommon::write(connection, msg.outCompressed, result.bytesWritten);
     ospcommon::flush(connection);
 
 #ifdef DENSITY_MEASURE_TIMES
-    std::chrono::high_resolution_clock::time_point tfinish_send =
-        std::chrono::high_resolution_clock::now();
+    if (compress_safe_size >= lion_packet_size) {
+      std::chrono::high_resolution_clock::time_point tfinish_send =
+          std::chrono::high_resolution_clock::now();
 
-    auto compression_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            tfinish_compression - tstart_compression)
-            .count();
-    auto compression_time_seconds =
-        std::chrono::duration_cast<std::chrono::seconds>(tfinish_compression -
-                                                         tstart_compression)
-            .count();
-    auto send_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         tfinish_send - tfinish_compression)
-                         .count();
-    auto send_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-                                 tfinish_send - tfinish_compression)
-                                 .count();
-    std::cout << "Compression ratio : "
-              << (float(result.bytesRead) / result.bytesWritten)<< " ";
-    std::cout << "Time compression : " << compression_time << "ms ("
-              << compression_time_seconds << "s) send: " << send_time << "ms ("
-              << send_time_seconds << "s)" << std::endl;
+      auto compression_time =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              tfinish_compression - tstart_compression)
+              .count();
+      auto compression_time_seconds =
+          std::chrono::duration_cast<std::chrono::seconds>(tfinish_compression -
+                                                           tstart_compression)
+              .count();
+      auto send_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                           tfinish_send - tfinish_compression)
+                           .count();
+      auto send_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                                   tfinish_send - tfinish_compression)
+                                   .count();
+      std::cout << "[ " << scount++ << " ] Compression ratio : "
+                << (float(msg.sz32) / result.bytesWritten) << " " << msg.sz32 << " /  "
+                << result.bytesWritten << " ";
+      std::cout << "Time compression : " << compression_time << "us ("
+                << compression_time_seconds << "s) send: " << send_time
+                << "us (" << send_time_seconds << "s)" << std::endl;
+    }
 #endif
 
-    delete[] outCompressed;
+    //delete[] outCompressed;
   }
 #else
   size_t TCPFabric::read(void *&mem)

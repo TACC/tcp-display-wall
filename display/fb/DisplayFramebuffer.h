@@ -151,7 +151,6 @@ namespace ospray {
         std::set<int> tilesMissing;
 
         vec2i maxTiles;
-
       };
 
       template <>
@@ -167,18 +166,16 @@ namespace ospray {
       inline void DisplayFramebuffer::accum(
           ospray::dw::display::TilePixels<OSP_FB_RGBA8> *tile)
       {
+        //          std::chrono::high_resolution_clock::time_point tstart =
+        //                  std::chrono::high_resolution_clock::now();
+        //
 
-//          std::chrono::high_resolution_clock::time_point tstart =
-//                  std::chrono::high_resolution_clock::now();
-//
-
-          if (!colorBufferFormat & OSP_FB_RGBA8)
+        if (!colorBufferFormat & OSP_FB_RGBA8)
           throw std::runtime_error("Incompatible buffer formats");
-        uint32 *color = (uint32 *) colorBuffer;
-        uint32 *pixels = (uint32 *) tile->finaltile;
+        uint32 *color  = (uint32 *)colorBuffer;
+        uint32 *pixels = (uint32 *)tile->finaltile;
 
-        if(mpicommon::IamAWorker()) {
-#if 1
+        if (mpicommon::IamAWorker()) {
           tasking::parallel_for(TILE_SIZE, [&](const int iy) {
             int y = ((tile->coords.y + iy) - pos.y);
             if (y < 0 || y >= size.y)
@@ -190,24 +187,24 @@ namespace ospray {
               color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
             }
           });
-#else
-          for (int iy = 0; iy < TILE_SIZE; iy++) {
-            int y = ((tile->coords.y + iy) - pos.y);
-            if (y < 0 || y >= size.y)
-              continue;
-            int diff_lower = pos.x - tile->coords.x;
-            int ix_lower   = (diff_lower <= 0) ? 0 : diff_lower;
-            int diff_upper = std::min(ix_lower + TILE_SIZE, size.x) - ix_lower;
-            int x_lower    = std::max(pos.x, tile->coords.x);
-            std::memcpy(&color[y * size.x + x_lower],
-                        &pixels[iy * TILE_SIZE + ix_lower],
-                        diff_upper * sizeof(u_int32_t));
-          }
-#endif
         } else {
-          int tsize_y =  int(1 / ratio.y);
-          int tsize_x =  int(1 / ratio.x);
-          for(int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
+#if 0
+          tasking::parallel_for(TILE_SIZE, [&](const int iy) {
+            int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
+            if (y < 0 || y >= size.y)
+              return;
+            for (int ix = 0; ix < TILE_SIZE; ix++) {
+              int x = ((tile->coords.x + ix) - pos.x) * ratio.x;
+              if (x < 0 || x >= size.x)
+                continue;
+              color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            }
+          });
+#else
+          int tsize_y = int(1 / ratio.y);
+          int tsize_x = int(1 / ratio.x);
+
+          for (int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
             int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
             if (y < 0 || y >= size.y)
               continue;
@@ -218,25 +215,10 @@ namespace ospray {
               color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
             }
           }
+#endif
         }
 
-
-          setNumTilesDone(tile->coords);
-
-//          std::chrono::high_resolution_clock::time_point tend =
-//                  std::chrono::high_resolution_clock::now();
-//
-//          auto num_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-//                  tend - tstart)
-//                  .count();
-//          auto num_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-//                  tend - tstart)
-//                  .count();
-//
-//          if(mpicommon::world.rank == 5) {
-//                std::cout << "Num time :" << num_time <<"ms( " << num_time_seconds <<"s)" <<std::endl;
-//          }
-
+        setNumTilesDone(tile->coords);
       }
 
       template <>

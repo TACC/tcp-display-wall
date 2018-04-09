@@ -28,8 +28,17 @@
 #include "ospcommon/networking/Socket.h"
 
 #include "MPICommon.h"
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 
 namespace mpicommon {
+
+  struct msg_send {
+    uint_fast64_t sz32;
+    uint_fast64_t bytesWritten;
+    byte_t *outCompressed;
+  };
 
   struct TCPFabric : public networking::Fabric
   {
@@ -51,15 +60,28 @@ namespace mpicommon {
       return server;
     }
 
+    bool active = {true};
+    std::mutex _protect_buffer;
+    std::vector<msg_send> outgoing;
+    std::condition_variable cv;
+    ospcommon::socket_t connection;
+    std::thread sendThread;
+
    private:
     // wait for Bcast with non-blocking test, and barrier
     // void waitForBcast(MPI_Request &);
     std::vector<byte_t> buffer;
     std::string hostname;
-    int port;
-    ospcommon::socket_t connection;
-
-
     bool server;
+    int port;
+
+
+
+
+
   };
+
+
+
+
 }  // namespace mpicommon

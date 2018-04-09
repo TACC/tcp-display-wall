@@ -59,12 +59,14 @@ void ospray::dw::display::SetTile::runOnMaster() {
     if (msg->command & MASTER_WRITE_TILE_I8) {
         auto MT8 = (MasterTileMessage_RGBA_I8 *) msg;
         display::TilePixels<OSP_FB_RGBA8> tile(MT8->coords, (byte_t *) MT8->color);
-
-        dfb->accum(&tile);
         const auto &ranks = device->wc->getRanks(tile.coords);
+
         for (auto &w : ranks) {
             sendToWorker(w, &tile, sizeof(tile));
         }
+        dfb->accum(&tile);
+
+
     } else if (msg->command & MASTER_WRITE_TILE_F32) {
         auto MT32 = (MasterTileMessage_RGBA_F32 *) msg;
         display::TilePixels<OSP_FB_RGBA32F> tile(MT32->coords,
@@ -89,7 +91,7 @@ void ospray::dw::display::SetTile::runOnMaster() {
             tend - tstart)
             .count();
 
-    std::cout << "Set tile time : " << num_time << "ms( " << num_time_seconds << "s)" << std::endl;
+//    std::cout << "Set tile time : " << num_time << "ms( " << num_time_seconds << "s)" << std::endl;
 
 }
 
@@ -109,10 +111,14 @@ void ospray::dw::display::CreateFrameBuffer::run() {
     assert(dimensions.x > 0);
     assert(dimensions.y > 0);
 
+
     auto wc =
             std::dynamic_pointer_cast<display::Device>(api::Device::current)->wc;
+
+
     FrameBuffer *fb;
     if (mpicommon::IamTheMaster()) {
+
         fb = new DisplayFramebuffer(
                 handle,
                 dimensions,
@@ -179,54 +185,53 @@ void ospray::dw::display::RenderFrame::runOnMaster() {
             std::chrono::high_resolution_clock::now();
     auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
     dfb->beginFrame();
-    std::chrono::high_resolution_clock::time_point tstart_master_frame =
-            std::chrono::high_resolution_clock::now();
+//    std::chrono::high_resolution_clock::time_point tstart_master_frame =
+//            std::chrono::high_resolution_clock::now();
 
     size_t totalM =0;
     while (!dfb->isFrameReady()) {
-        std::chrono::high_resolution_clock::time_point tstart_waiting_for_packet =
-                std::chrono::high_resolution_clock::now();
-
+//        std::chrono::high_resolution_clock::time_point tstart_waiting_for_packet =
+//                std::chrono::high_resolution_clock::now();
         auto work = device->readWork();
 
-        std::chrono::high_resolution_clock::time_point tend_waiting_for_packet =
-                std::chrono::high_resolution_clock::now();
-        auto wait_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                tend_waiting_for_packet - tstart_waiting_for_packet)
-                .count();
-
-        auto wait_time_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-                tend_waiting_for_packet - tstart_waiting_for_packet)
-                .count();
-
-        totalM += wait_time;
+//        std::chrono::high_resolution_clock::time_point tend_waiting_for_packet =
+//                std::chrono::high_resolution_clock::now();
+//        auto wait_time = std::chrono::duration_cast<std::chrono::microseconds>(
+//                tend_waiting_for_packet - tstart_waiting_for_packet)
+//                .count();
+//
+//        auto wait_time_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+//                tend_waiting_for_packet - tstart_waiting_for_packet)
+//                .count();
+//
+//        totalM += wait_time;
 
         //
-
         auto tag = typeIdOf(work);
         if (tag != typeIdOf<dw::display::SetTile>())
             throw std::runtime_error("Somthing went wrong it can only be a tile");
 
-
-        std::chrono::high_resolution_clock::time_point tstart_execute_for_packet =
-                std::chrono::high_resolution_clock::now();
+//
+//        std::chrono::high_resolution_clock::time_point tstart_execute_for_packet =
+//                std::chrono::high_resolution_clock::now();
 
         work->runOnMaster();
 
-        std::chrono::high_resolution_clock::time_point tend_execute_for_packet =
-                std::chrono::high_resolution_clock::now();
-        auto execute_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                tend_execute_for_packet - tstart_execute_for_packet)
-                .count();
-        auto execute_time_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-                tend_execute_for_packet - tstart_execute_for_packet)
-                .count();
+//        std::chrono::high_resolution_clock::time_point tend_execute_for_packet =
+//                std::chrono::high_resolution_zclock::now();
+//        auto execute_time = std::chrono::duration_cast<std::chrono::microseconds>(
+//                tend_execute_for_packet - tstart_execute_for_packet)
+//                .count();
+//        auto execute_time_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+//                tend_execute_for_packet - tstart_execute_for_packet)
+//                .count();
 
 
-        std::cout << "Waiting for packet : " << wait_time <<"us (" << wait_time_seconds << "ms) Execute : "  << execute_time <<"us (" << execute_time_seconds << "ms)" << std::endl;
+        //std::cout << "Waiting for packet : " << wait_time <<"us (" << wait_time_seconds << "ms) Execute : "  << execute_time <<"us (" << execute_time_seconds << "ms)" << std::endl;
     }
-    std::chrono::high_resolution_clock::time_point tend_master_frame =
-            std::chrono::high_resolution_clock::now();
+
+//    std::chrono::high_resolution_clock::time_point tend_master_frame =
+//            std::chrono::high_resolution_clock::now();
     dfb->endFrame(inf);
 
 
@@ -241,14 +246,23 @@ void ospray::dw::display::RenderFrame::runOnMaster() {
             tend_frame - tstart_frame)
             .count();
 
-    auto frame_master_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-            tend_master_frame - tstart_master_frame)
-            .count();
-    auto frame_master_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-            tend_master_frame - tstart_master_frame)
-            .count();
-    std::cout << "Time frame : " << frame_time << "ms ("
-              << frame_time_seconds << "s)" << " " << "Time master frame : " << frame_master_time << "ms ("
-              << frame_master_time_seconds << "s) : TW " << (float(totalM)/1000) << "ms total tiles : " << dfb->getTotalTiles()
+//    auto frame_master_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+//            tend_master_frame - tstart_master_frame)
+//            .count();
+//    auto frame_master_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+//            tend_master_frame - tstart_master_frame)
+//            .count();
+
+//    std::cout << "Time frame : " << frame_time << "ms ("
+//              << frame_time_seconds << "s)" << " " << "Time master frame : " << frame_master_time << "ms ("
+//              << frame_master_time_seconds << "s) : TW " << (float(totalM)/1000) << "ms total tiles : " << dfb->getTotalTiles()
+//              << std::endl;
+
+      std::cout << "[ " << add << "] Time frame : " << frame_time << "ms ("
+              << frame_time_seconds << "s) total tiles : " << dfb->getTotalTiles()
               << std::endl;
+
+
+  add++;
+//    if(add == 10) exit(0);
 }

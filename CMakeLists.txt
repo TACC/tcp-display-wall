@@ -23,6 +23,11 @@ IF(OSPRAY_MODULE_DISPLAYWALL)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
+    option(DW_USE_UDT OFF "Use UDT Communication library")
+    IF(DW_USE_UDT)
+        add_definitions("-DDW_USE_UDT")
+    ENDIF(DW_USE_UDT)
+
     add_subdirectory(common)
     add_subdirectory(farm)
     add_subdirectory(display)

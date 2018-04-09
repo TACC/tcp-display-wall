@@ -1,10 +1,10 @@
-# TCP Bridged Display Wall for OSPray Readme (v0.3)
+# TCP Bridged Display Wall for OSPray Readme (v0.4)
 
 This display wall module is based of the MPI Distributed module provided by the base OSPRay source code.
 
 ## Prerequisites
 
-#### OSPRay
+### OSPRay
 
 Follow the instructions to install from source [OSPRay](https://github.com/ospray/OSPRay)
 
@@ -13,31 +13,72 @@ found here
 
 [https://github.com/jgbarbosa/ospray/tree/dw](https://github.com/jgbarbosa/ospray/tree/dw)
 
-#### Google SNAPPY Compression
+##### Google SNAPPY Compression
 
-The display wall TCP connection depends on Google SNAPPY compression algorithm to compress/uncompress the data stream between
+Using Google SNAPPY compression algorithm to compress/uncompress the data stream between
 the display and the farm.
 
-Google implementation can be found [here https://github.com/google/snappy](https://github.com/google/snappy)
+Google implementation can be found here [https://github.com/google/snappy](https://github.com/google/snappy)
 
 ```
 git clone https://github.com/google/snappy.git
 cd snappy
 mkdir build;cd build
-cmake .. -DCMAKE_INSTALL_PREIX=<install path>
+cmake .. -DCMAKE_INSTALL_PREIX=[install path]
 make -j8; make install
-export SNAPPY_HOME=<install path>
+export SNAPPY_HOME=[install path]
 ```
+
+##### Density Compression
+
+Using compression algorithm to compress/uncompress the data stream between
+the display and the farm.
+
+Density implementation can be found here [https://github.com/centaurean/density.git](https://github.com/centaurean/density.git)
+
+Using cmake see patch bellow
+
+```
+git clone https://github.com/centaurean/density.git
+cd density
+make -j8
+export DENSITY_DIR=`pwd`
+```
+
+##### UDT Transport layer
+
+[UDT - UDP Data Transfer Layer](http://udt.sourceforge.net/)
+
+Using cmake see patch bellow
+
 
 ## Download and compile the module
 
 ```
-cd \<path to ospray\>/modules
-git clone https://jgbarbosa@bitbucket.org/jgbarbosa/dw.git
+cd path_to_ospray/modules
+git clone https://github.com/TACC/tcp-display-wall.git
 cd ../
 mkdir build
+```
 
-CC=<your favorite C compiler> CXX=<your favorite C compiler> cmake .. -DOSPRAY_MODULE_DISPLAYWALL=ON -DOSPRAY_MODULE_MPI=ON
+### Without compresssion
+```
+cmake .. -DOSPRAY_MODULE_DISPLAYWALL=ON -DOSPRAY_MODULE_MPI=ON
+
+make -j 8
+```
+
+### SNAPPY compresssion
+```
+cmake .. -DOSPRAY_MODULE_DISPLAYWALL=ON -DOSPRAY_MODULE_MPI=ON -DDW_USE_SNAPPY=ON
+
+make -j 8
+```
+
+
+### DENSITY compresssion
+```
+cmake .. -DOSPRAY_MODULE_DISPLAYWALL=ON -DOSPRAY_MODULE_MPI=ON -DDW_USE_DENSITY=ON
 
 make -j 8
 ```
@@ -83,16 +124,17 @@ make -j 8
  mpirun -n 1 ./ospExampleViewer --osp:module:dwdisplay --osp:device:dwdisplay <Visualiztion parameter> : -n <number of display nodes> ./dwDisplay --osp:module:dwdisplay --osp:device:dwdisplay
 ```
 
-To disable full screen:
+##### To disable full screen:
 ```
  export DW_FULLSCREEN=0
  mpirun -n 1 ./ospExampleViewer --osp:module:dwdisplay --osp:device:dwdisplay <Visualiztion parameter> : -n <number of display nodes> ./dwDisplay --osp:module:dwdisplay --osp:device:dwdisplay
 ```
 
+##### Use different configuration file
 By default it will try to load a file named _default.conf_. If we whish teh head node to read anotehr configuration file.
 
 ```
- export DW_CONF_FILE=<path_to>/other.conf
+ export DW_CONF_FILE=[path_to]/other.conf
  mpirun -n 1 ./ospExampleViewer --osp:module:dwdisplay --osp:device:dwdisplay <Visualiztion parameter> : -n <number of display nodes> ./dwDisplay --osp:module:dwdisplay --osp:device:dwdisplay
 ```
  
@@ -111,10 +153,29 @@ The farm will receive all data and commands from the display wall head node. And
 ### TODO:
 
     - [x] Compressed/Decompress all TCP connections
-        - [x] Using GOOGLE Snappy algorithm
-        - [ ] Using bz2 library
+        - [x] Using GOOGLE Snappy compression algorithm
+        - [x] Using Density compression algorithm
         - [ ] Find alternative
     - [x] Fix basel compensation code
     - [ ] Create single window client
     - [ ] Implement multiple render farm deployment
     - [ ] Implement window manager in the client side
+
+##### CMake patch for Density and UDT
+
+###### CMake patch for density
+```
+git clone https://github.com/centaurean/density.git
+cd density
+git submodule update --init --recursive
+git apply [path to ospray]/modules/tcp-display-wall/third-party/density-git-patch.txt
+
+```
+
+###### CMake patch for UTD
+```
+git clone https://git.code.sf.net/p/udt/git udt-git
+cd udt-git
+git apply [path to ospray]/modules/tcp-display-wall/third-party/udt-git-patch.txt
+
+```

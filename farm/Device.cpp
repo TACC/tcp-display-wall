@@ -28,6 +28,8 @@
 #include <future>
 #include "work/FarmWork.h"
 
+#include <common/networking/UDTFabric.h>
+
 ospray::dw::farm::Device::~Device() {}
 
 ospray::mpi::work::WorkTypeRegistry &ospray::dw::farm::Device::getWorkRegistry()
@@ -98,8 +100,13 @@ void ospray::dw::farm::Device::commit()
     auto DW_HOSTPORT = utility::getEnvVar<int>("DW_HOSTPORT").value_or(4444);
 
     try {
+#ifdef  DW_USE_UDT
       tcpFabric =
-          make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, false);
+        make_unique<mpicommon::UDTFabric>(DW_HOSTNAME, DW_HOSTPORT, false);
+#else
+      tcpFabric =
+        make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, false);
+#endif
       tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
       tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
     } catch (std::exception ex) {
