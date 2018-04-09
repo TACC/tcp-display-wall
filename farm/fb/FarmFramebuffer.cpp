@@ -43,8 +43,6 @@ ospray::dw::farm::DistributedFrameBuffer::DistributedFrameBuffer(
                                      masterIsAWorker)
 {
 
-  std::cout << "Buffer size" << size << std::endl;
-
 }
 ospray::dw::farm::DistributedFrameBuffer::~DistributedFrameBuffer() {}
 
