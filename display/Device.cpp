@@ -136,6 +136,10 @@ void ospray::dw::display::Device::processWork(mpi::work::Work &work,
   tcpwriteStream->write(&tag, sizeof(tag));
   work.serialize(*tcpwriteStream);
   tcpwriteStream->flush();
+  if(tag != typeIdOf(display::CreateFrameBuffer()) && (tag != typeIdOf(mpi::work::RenderFrame()))) {
+      work.runOnMaster();
+  }
+
 }
 OSPFrameBuffer ospray::dw::display::Device::frameBufferCreate(
     const ospcommon::vec2i &size,
