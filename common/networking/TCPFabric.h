@@ -1,6 +1,8 @@
 /* =======================================================================================
    This file is released as part of TCP Display Wall module for TCP Bridged
-   Display Wall module for OSPray tacc.github.io/display-wall
+   Display Wall module for OSPray
+
+   https://github.com/TACC/tcp-display-wall
 
    Copyright 2017-2018 Texas Advanced Computing Center, The University of Texas
    at Austin All rights reserved.
@@ -17,10 +19,12 @@
    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
    License for the specific language governing permissions and limitations under
    limitations under the License.
+
+   TCP Bridged Display Wall funded in part by an Intel Visualization Center of
+   Excellence award
    =======================================================================================
    @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
  */
-
 #pragma once
 
 #include "ospcommon/networking/DataStreaming.h"

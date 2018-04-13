@@ -1,6 +1,8 @@
 /* =======================================================================================
    This file is released as part of TCP Display Wall module for TCP Bridged
-   Display Wall module for OSPray tacc.github.io/display-wall
+   Display Wall module for OSPray
+
+   https://github.com/TACC/tcp-display-wall
 
    Copyright 2017-2018 Texas Advanced Computing Center, The University of Texas
    at Austin All rights reserved.
@@ -17,6 +19,9 @@
    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
    License for the specific language governing permissions and limitations under
    limitations under the License.
+
+   TCP Bridged Display Wall funded in part by an Intel Visualization Center of
+   Excellence award
    =======================================================================================
    @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
  */
@@ -173,7 +178,6 @@ namespace ospray {
         uint32 *pixels = (uint32 *) tile->finaltile;
 
         if(mpicommon::IamAWorker()) {
-#if 1
           tasking::parallel_for(TILE_SIZE, [&](const int iy) {
             int y = ((tile->coords.y + iy) - pos.y);
             if (y < 0 || y >= size.y)
@@ -185,20 +189,7 @@ namespace ospray {
               color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
             }
           });
-#else
-          for (int iy = 0; iy < TILE_SIZE; iy++) {
-            int y = ((tile->coords.y + iy) - pos.y);
-            if (y < 0 || y >= size.y)
-              continue;
-            int diff_lower = pos.x - tile->coords.x;
-            int ix_lower   = (diff_lower <= 0) ? 0 : diff_lower;
-            int diff_upper = std::min(ix_lower + TILE_SIZE, size.x) - ix_lower;
-            int x_lower    = std::max(pos.x, tile->coords.x);
-            std::memcpy(&color[y * size.x + x_lower],
-                        &pixels[iy * TILE_SIZE + ix_lower],
-                        diff_upper * sizeof(u_int32_t));
-          }
-#endif
+
         } else {
           int tsize_y =  int(1 / ratio.y);
           int tsize_x =  int(1 / ratio.x);
@@ -225,17 +216,34 @@ namespace ospray {
           throw std::runtime_error("Incompatible buffer formats");
         vec4f *color  = (vec4f *)colorBuffer;
         vec4f *pixels = (vec4f *)tile->finaltile;
-        tasking::parallel_for(TILE_SIZE, [&](const int iy) {
-          int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
-          if (y < 0 || y >= size.y)
-            return;
-          for (int ix = 0; ix < TILE_SIZE; ix++) {
-            int x = ((tile->coords.x + ix) - pos.x) * ratio.x;
-            if (x < 0 || x >= size.x)
+        if(mpicommon::IamAWorker()) {
+          tasking::parallel_for(TILE_SIZE, [&](const int iy) {
+            int y = ((tile->coords.y + iy) - pos.y);
+            if (y < 0 || y >= size.y)
+              return;
+            for (int ix = 0; ix < TILE_SIZE; ix++) {
+              int x = ((tile->coords.x + ix) - pos.x);
+              if (x < 0 || x >= size.x)
+                continue;
+              color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            }
+          });
+
+        } else {
+          int tsize_y =  int(1 / ratio.y);
+          int tsize_x =  int(1 / ratio.x);
+          for(int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
+            int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
+            if (y < 0 || y >= size.y)
               continue;
-            color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            for (int ix = 0; ix < TILE_SIZE; ix += tsize_x) {
+              int x = ((tile->coords.x + ix) - pos.x) * ratio.x;
+              if (x < 0 || x >= size.x)
+                continue;
+              color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+            }
           }
-        });
+        }
         setNumTilesDone(tile->coords);
       }
 
