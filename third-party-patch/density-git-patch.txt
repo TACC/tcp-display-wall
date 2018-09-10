@@ -1,0 +1,37 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+new file mode 100644
+index 0000000..2d09caf
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,4 @@
++cmake_minimum_required(VERSION 2.8)
++project(density)
++
++add_subdirectory(src)
+\ No newline at end of file
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+new file mode 100644
+index 0000000..b5559b9
+--- /dev/null
++++ b/src/CMakeLists.txt
+@@ -0,0 +1,20 @@
++cmake_minimum_required(VERSION 2.8)
++project(density)
++
++OPTION(BUILD_SHARED_LIB ON "Build shared library")
++
++FILE(GLOB_RECURSE DENSITY_SRC_FILES *.c)
++
++SET(DENSITY_HDR_FILES density_api.h)
++
++ADD_LIBRARY(${PROJECT_NAME}_STATIC STATIC ${DENSITY_SRC_FILES})
++set_target_properties(${PROJECT_NAME}_STATIC PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
++set_target_properties(${PROJECT_NAME}_STATIC PROPERTIES PUBLIC_HEADER ${DENSITY_HDR_FILES})
++INSTALL(TARGETS ${PROJECT_NAME}_STATIC ARCHIVE DESTINATION lib LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include/)
++
++IF(BUILD_SHARED_LIB)
++    ADD_LIBRARY(${PROJECT_NAME}_SHARED SHARED ${DENSITY_SRC_FILES})
++    set_target_properties(${PROJECT_NAME}_SHARED PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
++    set_target_properties(${PROJECT_NAME}_SHARED PROPERTIES PUBLIC_HEADER ${DENSITY_HDR_FILES})
++    INSTALL(TARGETS ${PROJECT_NAME}_SHARED ARCHIVE DESTINATION lib LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include/)
++ENDIF()
