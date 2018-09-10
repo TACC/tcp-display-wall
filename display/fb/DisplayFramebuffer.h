@@ -101,14 +101,12 @@ namespace ospray {
       };
 
       struct DisplayFramebuffer : mpi::messaging::MessageHandler,
-                                  ospray::FrameBuffer
+                                  ospray::LocalFrameBuffer
       {
         DisplayFramebuffer(ObjectHandle &handle,
                            const vec2i &size,
                            ColorBufferFormat colorBufferFormat,
-                           bool hasDepthBuffer,
-                           bool hasAccumBuffer,
-                           bool hasVarianceBuffer,
+                           uint32_t channels,
                            const vec2i &pos,
                            const vec2f &ratio,
                            const vec2i &completeScreen);
@@ -117,13 +115,6 @@ namespace ospray {
         bool isFrameReady();
         bool setNumTilesDone(const vec2i &tilesDone);
         void waitUntilFrameDone();
-        const void *mapDepthBuffer() override;
-        const void *mapColorBuffer() override;
-        void unmap(const void *mappedMem) override;
-        void setTile(Tile &tile) override;
-        void clear(const uint32 fbChannelFlags) override;
-        int32 accumID(const vec2i &tile) override;
-        float tileError(const vec2i &tile) override;
         void beginFrame() override;
         float endFrame(const float errorThreshold) override;
         int getTotalTiles() const;
@@ -139,10 +130,10 @@ namespace ospray {
         std::set<int> diff();
 
        protected:
-        std::atomic<size_t> numTilesDone{0};
+
+
         std::mutex done;
         std::condition_variable condition_done;
-        void *colorBuffer = nullptr;
         std::atomic<bool> frameActive{false};
         std::atomic<bool> frameeDone{false};
         vec2f ratio;

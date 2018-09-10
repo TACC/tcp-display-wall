@@ -1,0 +1,6 @@
+#!/bin/bash
+
+
+##  xterm -fg white -bg black -e gdb --args
+
+mpirun -n 1 ./ospExampleViewer --osp:mpi ~/rs/intel/data/fiu-groundwater.xml : -n 1 ./ospray_mpi_worker

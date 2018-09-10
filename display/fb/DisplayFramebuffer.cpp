@@ -53,7 +53,8 @@ bool inline tileBelongsTo(const ospcommon::vec2i &tpos,
   return test;
 }
 
-inline int tileID(const ospcommon::vec2i& max,const ospcommon::vec2i& tile) {
+inline int tileID(const ospcommon::vec2i &max, const ospcommon::vec2i &tile)
+{
   return (tile.y * max.x) + tile.x;
 }
 
@@ -61,18 +62,12 @@ ospray::dw::display::DisplayFramebuffer::DisplayFramebuffer(
     ObjectHandle &handle,
     const ospcommon::vec2i &size,
     ColorBufferFormat colorBufferFormat,
-    bool hasDepthBuffer,
-    bool hasAccumBuffer,
-    bool hasVarianceBuffer,
+    uint32_t channels,
     const vec2i &pos,
     const vec2f &ratio,
     const vec2i &completeScreen)
     : mpi::messaging::MessageHandler(handle),
-      ospray::FrameBuffer(size,
-                          colorBufferFormat,
-                          hasDepthBuffer,
-                          hasAccumBuffer,
-                          hasVarianceBuffer),
+      ospray::LocalFrameBuffer(size, colorBufferFormat, channels),
       pos(pos),
       ratio(ratio),
       completeScreen(completeScreen)
@@ -93,15 +88,15 @@ ospray::dw::display::DisplayFramebuffer::DisplayFramebuffer(
     break;
   }
 
-  maxTiles = ospcommon::divRoundUp(completeScreen,ospcommon::vec2i(TILE_SIZE));
+  maxTiles = ospcommon::divRoundUp(completeScreen, ospcommon::vec2i(TILE_SIZE));
 
   for (int y = 0; y < completeScreen.y; y += TILE_SIZE) {
     for (int x = 0; x < completeScreen.x; x += TILE_SIZE) {
       vec2i p(x, y);
       if (mpicommon::IamTheMaster())
-        tilesRequired.insert(tileID(maxTiles,p));
+        tilesRequired.insert(tileID(maxTiles, p));
       else if (tileBelongsTo(p, vec2i(TILE_SIZE), pos, size))
-        tilesRequired.insert(tileID(maxTiles,p));
+        tilesRequired.insert(tileID(maxTiles, p));
     }
   }
 }
@@ -120,12 +115,12 @@ bool ospray::dw::display::DisplayFramebuffer::setNumTilesDone(
     const vec2i &tileDone)
 {
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
-  if(tilesMissing.find(tileID(maxTiles,tileDone)) != tilesMissing.end()) {
-      tilesMissing.erase(tileID(maxTiles, tileDone));
+  if (tilesMissing.find(tileID(maxTiles, tileDone)) != tilesMissing.end()) {
+    tilesMissing.erase(tileID(maxTiles, tileDone));
   }
   frameeDone = tilesMissing.empty();
   if (frameeDone) {
-      condition_done.notify_all();
+    condition_done.notify_all();
   }
   return frameeDone;
 }
@@ -143,9 +138,12 @@ void ospray::dw::display::DisplayFramebuffer::incoming(
     ;
   auto tile = (TileData *)message->data;
 
-  if(tilesRequired.find(tileID(maxTiles,tile->coords)) == tilesRequired.end()) {
-      std::cout << "[" << mpicommon::worker.rank << " ] " << tile->coords << " x " << pos  << " : " << (pos + size)  << " : " << tilesMissing.size() << std::endl;
-      return;
+  if (tilesRequired.find(tileID(maxTiles, tile->coords)) ==
+      tilesRequired.end()) {
+    std::cout << "[" << mpicommon::worker.rank << " ] " << tile->coords << " x "
+              << pos << " : " << (pos + size) << " : " << tilesMissing.size()
+              << std::endl;
+    return;
   }
 
   switch (tile->type) {
@@ -159,58 +157,26 @@ void ospray::dw::display::DisplayFramebuffer::incoming(
     accum((TilePixels<OSP_FB_NONE> *)tile);
     break;
   }
-
 }
 
 void ospray::dw::display::DisplayFramebuffer::beginFrame()
 {
+  LocalFrameBuffer::beginFrame();
   frameeDone = false;
   mpi::messaging::enableAsyncMessaging();
   std::lock_guard<std::mutex> lock(tilesDone_mutex);
   tilesMissing = tilesRequired;
-  frameActive = true;
+  frameActive  = true;
 }
 
 float ospray::dw::display::DisplayFramebuffer::endFrame(
     const float errorThreshold)
 {
+  LocalFrameBuffer::endFrame(errorThreshold);
   mpi::messaging::disableAsyncMessaging();
   frameActive = false;
 }
-const void *ospray::dw::display::DisplayFramebuffer::mapDepthBuffer()
-{
-  return nullptr;
-}
-const void *ospray::dw::display::DisplayFramebuffer::mapColorBuffer()
-{
-  this->refInc();
-  return (const void *)colorBuffer;
-}
-void ospray::dw::display::DisplayFramebuffer::unmap(const void *mappedMem)
-{
-  if (!(mappedMem == colorBuffer)) {
-    throw std::runtime_error(
-        "ERROR: unmapping a pointer not created by "
-        "OSPRay!");
-  }
-  this->refDec();
-}
-void ospray::dw::display::DisplayFramebuffer::setTile(ospray::Tile &tile) {}
-void ospray::dw::display::DisplayFramebuffer::clear(
-    const ospray::uint32 fbChannelFlags)
-{
-  frameID = -1;  // we increment at the start of the frame
-}
-ospray::int32 ospray::dw::display::DisplayFramebuffer::accumID(
-    const ospcommon::vec2i &tile)
-{
-  return 0;
-}
-float ospray::dw::display::DisplayFramebuffer::tileError(
-    const ospcommon::vec2i &tile)
-{
-  return 0;
-}
+
 int ospray::dw::display::DisplayFramebuffer::getTotalTiles() const
 {
   return tilesRequired.size();

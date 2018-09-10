@@ -83,7 +83,7 @@ namespace mpicommon {
     return compressed_data_size;
   }
 
-  void TCPFabric::send(void *mem, size_t size)
+  void TCPFabric::send(const void *mem, size_t size)
   {
     assert(size < (1LL << 30));
     uint32_t sz32               = size;
@@ -179,7 +179,7 @@ namespace mpicommon {
     return result.bytesWritten;
   }
 
-  void TCPFabric::send(void *mem, size_t size)
+  void TCPFabric::send(const void *mem, size_t size)
   {
     assert(size < (1LL << 30));
     uint_fast64_t sz32               = size;
@@ -264,7 +264,7 @@ namespace mpicommon {
     return sz32;
   }
 
-  void TCPFabric::send(void *mem, size_t size)
+    void TCPFabric::send(const void *mem, size_t size)
   {
     assert(size < (1LL << 30));
     uint32_t sz32 = size;

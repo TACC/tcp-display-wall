@@ -95,13 +95,9 @@ ospray::dw::display::CreateFrameBuffer::CreateFrameBuffer(
 
 void ospray::dw::display::CreateFrameBuffer::run()
 {
-  const bool hasDepthBuffer    = channels & OSP_FB_DEPTH;
-  const bool hasAccumBuffer    = channels & OSP_FB_ACCUM;
-  const bool hasVarianceBuffer = channels & OSP_FB_VARIANCE;
 
   assert(dimensions.x > 0);
   assert(dimensions.y > 0);
-
   auto wc =
       std::dynamic_pointer_cast<display::Device>(api::Device::current)->wc;
   FrameBuffer *fb;
@@ -110,9 +106,7 @@ void ospray::dw::display::CreateFrameBuffer::run()
         handle,
         dimensions,
         format,
-        hasDepthBuffer,
-        hasAccumBuffer,
-        hasVarianceBuffer,
+        channels,
         vec2i(0),
         vec2f(float(dimensions.x) / wc->completeScreeen.x,
               float(dimensions.y) / wc->completeScreeen.y),
@@ -121,9 +115,7 @@ void ospray::dw::display::CreateFrameBuffer::run()
     fb = new DisplayFramebuffer(handle,
                                 wc->localScreen,
                                 format,
-                                hasDepthBuffer,
-                                hasAccumBuffer,
-                                hasVarianceBuffer,
+                                channels,
                                 wc->localPosition,
                                 vec2f(1.f),
                                 wc->completeScreeen);
@@ -161,11 +153,16 @@ void ospray::dw::display::RenderFrame::run()
   dfb->beginFrame();
   dfb->waitUntilFrameDone();
   dfb->endFrame(inf);
-  byte_t *color = (byte_t *)dfb->mapColorBuffer();
+  byte_t *color = (byte_t *)dfb->mapBuffer(OSP_FB_COLOR);
+
+
   mpicommon::worker.barrier();
+
   dw::glDisplay::loadFrame(color, dfb->size);
+
   mpicommon::world.barrier();
-  dfb->unmap(color);
+
+  if(color) dfb->unmap(color);
 }
 
 void ospray::dw::display::RenderFrame::runOnMaster()
@@ -173,12 +170,8 @@ void ospray::dw::display::RenderFrame::runOnMaster()
   auto device =
       std::dynamic_pointer_cast<dw::display::Device>(api::Device::current);
   assert(device);
-//  std::chrono::high_resolution_clock::time_point tstart_frame =
-//    std::chrono::high_resolution_clock::now();
   auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
   dfb->beginFrame();
-//  std::chrono::high_resolution_clock::time_point tstart_master_frame =
-//    std::chrono::high_resolution_clock::now();
   while (!dfb->isFrameReady()) {
     auto work = device->readWork();
     auto tag  = typeIdOf(work);
@@ -186,31 +179,6 @@ void ospray::dw::display::RenderFrame::runOnMaster()
       throw std::runtime_error("Somthing went wrong it can only be a tile");
     work->runOnMaster();
   }
-//  std::chrono::high_resolution_clock::time_point tend_master_frame =
-//    std::chrono::high_resolution_clock::now();
   dfb->endFrame(inf);
-
-
-
   mpicommon::world.barrier();
-//  std::chrono::high_resolution_clock::time_point tend_frame =
-//    std::chrono::high_resolution_clock::now();
-//
-//  auto frame_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-//    tend_frame - tstart_master_frame)
-//    .count();
-//  auto frame_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-//    tend_frame - tstart_master_frame)
-//    .count();
-//
-//  auto frame_master_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-//    tend_master_frame - tstart_frame)
-//    .count();
-//  auto frame_master_time_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-//    tend_master_frame - tstart_frame)
-//    .count();
-//  std::cout << "Time frame : " << frame_time << "ms ("
-//            << frame_time_seconds << "s)" << " " << "Time master frame : " << frame_master_time << "ms ("
-//                                                    << frame_master_time_seconds << "s)"
-//            << std::endl;
 }

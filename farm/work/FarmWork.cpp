@@ -45,9 +45,7 @@ void ospray::dw::farm::CreateFrameBuffer::runOnMaster()
       new ospray::dw::farm::DistributedFrameBuffer(dimensions,
                                                    handle,
                                                    format,
-                                                   hasDepthBuffer,
-                                                   hasAccumBuffer,
-                                                   hasVarianceBuffer);
+                                                   channels);
 
   handle.assign(fb);
 }
@@ -71,4 +69,5 @@ void ospray::dw::farm::registerOSPWorkItems(
 
   // Create a different buffer (instead of writing the buffer just forward)
   mpi::work::registerWorkUnit<dw::farm::CreateFrameBuffer>(registry);
+
 }

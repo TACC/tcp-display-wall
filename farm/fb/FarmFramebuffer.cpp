@@ -35,16 +35,12 @@ ospray::dw::farm::DistributedFrameBuffer::DistributedFrameBuffer(
     const ospcommon::vec2i &numPixels,
     ospray::ObjectHandle myHandle,
     ospray::FrameBuffer::ColorBufferFormat format,
-    bool hasDepthBuffer,
-    bool hasAccumBuffer,
-    bool hasVarianceBuffer,
+    uint32_t channels,
     bool masterIsAWorker)
     : ospray::DistributedFrameBuffer(numPixels,
                                      myHandle,
                                      format,
-                                     hasDepthBuffer,
-                                     hasAccumBuffer,
-                                     hasVarianceBuffer,
+                                     channels,
                                      masterIsAWorker)
 {
 
@@ -59,7 +55,6 @@ void ospray::dw::farm::DistributedFrameBuffer::scheduleProcessing(
         auto device = std::dynamic_pointer_cast<ospray::dw::farm::Device>(
                 ospray::api::Device::current);
         assert(device);
-
         device->sendWorkDisplayWall(tile, true);
   });
   ospray::DistributedFrameBuffer::scheduleProcessing(message);

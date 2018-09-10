@@ -87,7 +87,6 @@ void ospray::dw::display::Device::initializeDevice()
 
 void ospray::dw::display::Device::commit()
 {
-
   if (!initialized) {
     initializeDevice();
     if (mpicommon::IamAWorker())
@@ -141,11 +140,12 @@ void ospray::dw::display::Device::processWork(mpi::work::Work &work,
   tcpwriteStream->write(&tag, sizeof(tag));
   work.serialize(*tcpwriteStream);
   tcpwriteStream->flush();
-  if(tag != typeIdOf(display::CreateFrameBuffer()) && (tag != typeIdOf(mpi::work::RenderFrame()))) {
-      work.runOnMaster();
+  if (tag != typeIdOf(display::CreateFrameBuffer()) &&
+      (tag != typeIdOf(mpi::work::RenderFrame()))) {
+    work.runOnMaster();
   }
-
 }
+
 OSPFrameBuffer ospray::dw::display::Device::frameBufferCreate(
     const ospcommon::vec2i &size,
     const OSPFrameBufferFormat mode,
@@ -165,6 +165,7 @@ OSPFrameBuffer ospray::dw::display::Device::frameBufferCreate(
   work.runOnMaster();
   return (OSPFrameBuffer)(int64)handle;
 }
+
 float ospray::dw::display::Device::renderFrame(
     OSPFrameBuffer _fb,
     OSPRenderer _renderer,

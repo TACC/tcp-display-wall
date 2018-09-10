@@ -40,9 +40,7 @@ namespace ospray {
         DistributedFrameBuffer(const vec2i &numPixels,
                                ObjectHandle myHandle,
                                ColorBufferFormat format,
-                               bool hasDepthBuffer,
-                               bool hasAccumBuffer,
-                               bool hasVarianceBuffer,
+                               uint32_t channels,
                                bool masterIsAWorker = false);
         ~DistributedFrameBuffer() override;
         void scheduleProcessing(
