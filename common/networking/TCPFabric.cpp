@@ -27,6 +27,9 @@
  */
 
 #include "TCPFabric.h"
+
+#include <sys/ioctl.h>
+
 #include <chrono>
 
 #if defined(DW_USE_SNAPPY)
@@ -278,4 +281,13 @@ namespace mpicommon {
     ospcommon::flush(connection);
   }
 #endif
+
+
+  bool TCPFabric::hasData() {
+    int fd = (int)*((int*)connection);
+    int count = 0;
+    if(ioctl(fd,FIONREAD,&count) < 0) throw std::runtime_error("TCP connection dropped");
+    return (count > 0);
+  }
+
 }  // namespace mpicommon

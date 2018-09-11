@@ -97,14 +97,24 @@ void ospray::dw::farm::Device::commit()
     ospray::mpi::runWorker(workRegistry);
 
   if (!tcp_initialized && mpicommon::IamTheMaster()) {
+    auto DW_START_SERVER =
+        (utility::getEnvVar<int>("DW_START_SERVER").value_or(1) == 1);
+
     auto DW_HOSTNAME = utility::getEnvVar<std::string>("DW_HOSTNAME")
                            .value_or(std::string("localhost"));
 
     auto DW_HOSTPORT = utility::getEnvVar<int>("DW_HOSTPORT").value_or(4444);
 
+    if (DW_START_SERVER)
+      std::cout << "Waiting for connection on " << DW_HOSTNAME << ":"
+                << DW_HOSTPORT << std::endl;
+    else
+      std::cout << "Trying to connect to " << DW_HOSTNAME << ":" << DW_HOSTPORT
+                << std::endl;
+
     try {
-      tcpFabric =
-          make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, false);
+      tcpFabric = make_unique<mpicommon::TCPFabric>(
+          DW_HOSTNAME, DW_HOSTPORT, DW_START_SERVER);
       tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
       tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
     } catch (std::exception ex) {

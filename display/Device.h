@@ -50,6 +50,7 @@ namespace ospray {
                                          const uint32 channels) override;
 
         std::unique_ptr<mpi::work::Work> readWork();
+        std::unique_ptr<mpi::work::Work> readTileWork();
 
         wallconfig *wc;
 

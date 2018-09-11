@@ -101,18 +101,32 @@ void ospray::dw::display::Device::commit()
   if (!tcp_initialized) {
     tcp_initialized = true;
 
+    auto DW_START_SERVER =
+        (utility::getEnvVar<int>("DW_START_SERVER").value_or(0) == 1);
+
     auto DW_HOSTNAME = utility::getEnvVar<std::string>("DW_HOSTNAME")
                            .value_or(std::string("localhost"));
 
     auto DW_HOSTPORT = utility::getEnvVar<int>("DW_HOSTPORT").value_or(4444);
     std::cout << "Waiting farm connection on : " << DW_HOSTNAME << ":"
               << DW_HOSTPORT << std::endl;
-    tcpFabric =
-        make_unique<mpicommon::TCPFabric>(DW_HOSTNAME, DW_HOSTPORT, true);
 
-    tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
-    tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
-    std::cout << "Farm connected" << std::endl;
+    if (DW_START_SERVER)
+      std::cout << "Waiting for connection on " << DW_HOSTNAME << ":"
+                << DW_HOSTPORT << std::endl;
+    else
+      std::cout << "Trying to connect to " << DW_HOSTNAME << ":" << DW_HOSTPORT
+                << std::endl;
+
+    try {
+      tcpFabric = make_unique<mpicommon::TCPFabric>(
+          DW_HOSTNAME, DW_HOSTPORT, DW_START_SERVER);
+      tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
+      tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
+    } catch (std::exception ex) {
+      std::cerr << "Unable to connect to farm " << DW_HOSTNAME << ":"
+                << DW_HOSTPORT << std::endl;
+    }
   }
 
   auto OSPRAY_DYNAMIC_LOADBALANCER =
@@ -186,6 +200,20 @@ float ospray::dw::display::Device::renderFrame(
 std::unique_ptr<ospray::mpi::work::Work> ospray::dw::display::Device::readWork()
 {
   auto work = ospray::mpi::readWork(workRegistry, *tcpreadStream);
+  return std::move(work);
+}
+
+std::unique_ptr<ospray::mpi::work::Work>
+ospray::dw::display::Device::readTileWork()
+{
+  if (!((mpicommon::TCPFabric *)tcpFabric.get())->hasData())
+    return nullptr;
+  auto work = ospray::mpi::readWork(workRegistry, *tcpreadStream);
+
+  auto tag = typeIdOf(work);
+  if (tag != typeIdOf<dw::display::SetTile>())
+    throw std::runtime_error("Somthing went wrong it can only be a tile");
+
   return std::move(work);
 }
 

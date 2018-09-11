@@ -55,6 +55,9 @@ namespace mpicommon {
       return server;
     }
 
+
+    virtual bool hasData();
+
     private:
     // wait for Bcast with non-blocking test, and barrier
     // void waitForBcast(MPI_Request &);

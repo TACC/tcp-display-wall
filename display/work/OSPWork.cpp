@@ -64,21 +64,35 @@ void ospray::dw::display::SetTile::runOnMaster()
     auto MT8 = (MasterTileMessage_RGBA_I8 *)msg;
     display::TilePixels<OSP_FB_RGBA8> tile(MT8->coords, (byte_t *)MT8->color);
 
+    /// Create a thread to send and don't care
+    std::async([&]() {
+      const auto &ranks = device->wc->getRanks(tile.coords);
+      std::shared_ptr<maml::Message> msgsend =
+          std::make_shared<maml::Message>(&tile, sizeof(tile));
+      for (auto &w : ranks) {
+        mpi::messaging::sendTo(
+            mpicommon::globalRankFromWorkerRank(w), fbHandle, msgsend);
+      }
+    });
     dfb->accum(&tile);
-    const auto &ranks = device->wc->getRanks(tile.coords);
-    for (auto &w : ranks) {
-      sendToWorker(w, &tile, sizeof(tile));
-    }
+
   } else if (msg->command & MASTER_WRITE_TILE_F32) {
     auto MT32 = (MasterTileMessage_RGBA_F32 *)msg;
     display::TilePixels<OSP_FB_RGBA32F> tile(MT32->coords,
                                              (byte_t *)MT32->color);
 
+    /// Create a thread to send and don't care
+    std::async([&]() {
+      const auto &ranks = device->wc->getRanks(tile.coords);
+      std::shared_ptr<maml::Message> msgsend =
+          std::make_shared<maml::Message>(&tile, sizeof(tile));
+      for (auto &w : ranks) {
+        mpi::messaging::sendTo(
+            mpicommon::globalRankFromWorkerRank(w), fbHandle, msgsend);
+      }
+    });
     dfb->accum(&tile);
-    const auto &ranks = device->wc->getRanks(tile.coords);
-    for (auto &w : ranks) {
-      sendToWorker(w, &tile, sizeof(tile));
-    }
+
   } else {
     throw std::runtime_error("Got an unexpected message");
   }
@@ -95,7 +109,6 @@ ospray::dw::display::CreateFrameBuffer::CreateFrameBuffer(
 
 void ospray::dw::display::CreateFrameBuffer::run()
 {
-
   assert(dimensions.x > 0);
   assert(dimensions.y > 0);
   auto wc =
@@ -155,14 +168,14 @@ void ospray::dw::display::RenderFrame::run()
   dfb->endFrame(inf);
   byte_t *color = (byte_t *)dfb->mapBuffer(OSP_FB_COLOR);
 
-
   mpicommon::worker.barrier();
 
   dw::glDisplay::loadFrame(color, dfb->size);
 
   mpicommon::world.barrier();
 
-  if(color) dfb->unmap(color);
+  if (color)
+    dfb->unmap(color);
 }
 
 void ospray::dw::display::RenderFrame::runOnMaster()
@@ -174,10 +187,13 @@ void ospray::dw::display::RenderFrame::runOnMaster()
   dfb->beginFrame();
   while (!dfb->isFrameReady()) {
     auto work = device->readWork();
-    auto tag  = typeIdOf(work);
-    if (tag != typeIdOf<dw::display::SetTile>())
-      throw std::runtime_error("Somthing went wrong it can only be a tile");
-    work->runOnMaster();
+    if (work) {
+      std::async(
+          [](std::unique_ptr<ospray::mpi::work::Work> &&work) {
+            work->runOnMaster();
+          },
+          std::move(work));
+    }
   }
   dfb->endFrame(inf);
   mpicommon::world.barrier();
