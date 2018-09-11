@@ -127,6 +127,8 @@ void ospray::dw::display::Device::commit()
       std::cerr << "Unable to connect to farm " << DW_HOSTNAME << ":"
                 << DW_HOSTPORT << std::endl;
     }
+
+    std::cout << "Connected [" << TILE_SIZE <<"]" << std::endl;
   }
 
   auto OSPRAY_DYNAMIC_LOADBALANCER =
