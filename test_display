@@ -2,4 +2,6 @@
 
 ## xterm -fg white -bg black -e gdb --args
 
+export DW_FULLSCREEN=0
+
 mpirun -n 1 ./ospExampleViewer --osp:module:dwdisplay --osp:device:dwdisplay ~/rs/intel/data/fiu-groundwater.xml : -n 1 ./dwDisplay --osp:module:dwdisplay --osp:device:dwdisplay

@@ -32,7 +32,10 @@
 #include <mpi/fb/DistributedFrameBuffer.h>
 #include <future>
 
-static std::atomic<size_t> add;
+#include <ospcommon/tasking/parallel_foreach.h>
+#include <ospcommon/tasking/schedule.h>
+
+//#define DW_MEASURE_RENDER 1
 
 ospray::dw::display::SetTile::SetTile(ospray::ObjectHandle &handle,
                                       const ospray::uint64 &size,
@@ -55,47 +58,47 @@ void ospray::dw::display::SetTile::sendToWorker(size_t worker,
 
 void ospray::dw::display::SetTile::runOnMaster()
 {
+  Buffer _buffer;
+  _buffer.decode(data);
+
   auto device =
       std::dynamic_pointer_cast<display::Device>(api::Device::current);
   auto dfb = dynamic_cast<dw::display::DisplayFramebuffer *>(fbHandle.lookup());
-  auto *msg = (ospray::TileMessage *)data;
 
-  if (msg->command & MASTER_WRITE_TILE_I8) {
-    auto MT8 = (MasterTileMessage_RGBA_I8 *)msg;
-    display::TilePixels<OSP_FB_RGBA8> tile(MT8->coords, (byte_t *)MT8->color);
-
-    /// Create a thread to send and don't care
-    std::async([&]() {
+  for (auto &tdata : _buffer._buffer_data) {
+    auto *msg = (ospray::MasterTileMessage *)tdata.get();
+    if (msg->command & MASTER_WRITE_TILE_I8) {
+      dfb->accum<OSP_FB_RGBA8>(msg->coords,
+                               ((MasterTileMessage_RGBA_I8 *)msg)->color);
+      display::TilePixels<OSP_FB_RGBA8> tile(
+          msg->coords, (byte_t *)((MasterTileMessage_RGBA_I8 *)msg)->color);
       const auto &ranks = device->wc->getRanks(tile.coords);
       std::shared_ptr<maml::Message> msgsend =
           std::make_shared<maml::Message>(&tile, sizeof(tile));
+
       for (auto &w : ranks) {
         mpi::messaging::sendTo(
             mpicommon::globalRankFromWorkerRank(w), fbHandle, msgsend);
       }
-    });
-    dfb->accum(&tile);
+    } else if (msg->command & MASTER_WRITE_TILE_F32) {
+      dfb->accum<OSP_FB_RGBA32F>(
+          msg->coords,
+          (unsigned int *)((MasterTileMessage_RGBA_F32 *)msg)->color);
 
-  } else if (msg->command & MASTER_WRITE_TILE_F32) {
-    auto MT32 = (MasterTileMessage_RGBA_F32 *)msg;
-    display::TilePixels<OSP_FB_RGBA32F> tile(MT32->coords,
-                                             (byte_t *)MT32->color);
-
-    /// Create a thread to send and don't care
-    std::async([&]() {
+      display::TilePixels<OSP_FB_RGBA32F> tile(
+          msg->coords, (byte_t *)((MasterTileMessage_RGBA_F32 *)msg)->color);
       const auto &ranks = device->wc->getRanks(tile.coords);
       std::shared_ptr<maml::Message> msgsend =
           std::make_shared<maml::Message>(&tile, sizeof(tile));
+
       for (auto &w : ranks) {
         mpi::messaging::sendTo(
             mpicommon::globalRankFromWorkerRank(w), fbHandle, msgsend);
       }
-    });
-    dfb->accum(&tile);
-
-  } else {
-    throw std::runtime_error("Got an unexpected message");
-  }
+    } else {
+      throw std::runtime_error("Got an unexpected message");
+    }
+  };
 }
 
 ospray::dw::display::CreateFrameBuffer::CreateFrameBuffer(
@@ -121,8 +124,12 @@ void ospray::dw::display::CreateFrameBuffer::run()
         format,
         channels,
         vec2i(0),
+#ifndef __APPLE__
         vec2f(float(dimensions.x) / wc->completeScreeen.x,
               float(dimensions.y) / wc->completeScreeen.y),
+#else
+        vec2f(1.f),
+#endif
         wc->completeScreeen);
   } else {
     fb = new DisplayFramebuffer(handle,
@@ -167,34 +174,65 @@ void ospray::dw::display::RenderFrame::run()
   dfb->waitUntilFrameDone();
   dfb->endFrame(inf);
   byte_t *color = (byte_t *)dfb->mapBuffer(OSP_FB_COLOR);
-
   mpicommon::worker.barrier();
-
   dw::glDisplay::loadFrame(color, dfb->size);
-
   mpicommon::world.barrier();
-
   if (color)
     dfb->unmap(color);
 }
 
 void ospray::dw::display::RenderFrame::runOnMaster()
 {
+#ifdef DW_MEASURE_RENDER
+  auto start = std::chrono::steady_clock::now();
+#endif
+
   auto device =
       std::dynamic_pointer_cast<dw::display::Device>(api::Device::current);
   assert(device);
   auto *dfb = dynamic_cast<display::DisplayFramebuffer *>(fbHandle.lookup());
   dfb->beginFrame();
+
+  auto read    = 0;
+  auto process = 0;
+
   while (!dfb->isFrameReady()) {
+#ifdef DW_MEASURE_RENDER
+    auto wait_start = std::chrono::steady_clock::now();
+#endif
+
     auto work = device->readWork();
-    if (work) {
-      std::async(
-          [](std::unique_ptr<ospray::mpi::work::Work> &&work) {
-            work->runOnMaster();
-          },
-          std::move(work));
-    }
+
+#ifdef DW_MEASURE_RENDER
+    auto wait_end = std::chrono::steady_clock::now();
+#endif
+
+    work->runOnMaster();
+
+#ifdef DW_MEASURE_RENDER
+    auto process_end = std::chrono::steady_clock::now();
+    read += std::chrono::duration_cast<std::chrono::milliseconds>(wait_end -
+                                                                  wait_start)
+                .count();
+    process += std::chrono::duration_cast<std::chrono::milliseconds>(
+                   process_end - wait_end)
+                   .count();
+#endif
   }
+
+#ifdef DW_MEASURE_RENDER
+  auto end_frame = std::chrono::steady_clock::now();
+#endif
+
   dfb->endFrame(inf);
   mpicommon::world.barrier();
+
+#ifdef DW_MEASURE_RENDER
+  auto end = std::chrono::steady_clock::now();
+  auto spf =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end_frame - start);
+  auto fps = 1.f / (spf.count() * 0.001);
+  std::cout << "FPS : " << fps << " (" << spf.count() << "ms, " << read
+            << "ms, " << process << "ms )\n";
+#endif
 }

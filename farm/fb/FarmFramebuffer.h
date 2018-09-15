@@ -27,9 +27,15 @@
  */
 #pragma once
 
+#include <set>
+#include <thread>
+#include <mutex>
+
 #include <api/Device.h>
 #include <mpi/fb/DistributedFrameBuffer.h>
 #include "../Device.h"
+
+#include <common/work/DWwork.h>
 
 namespace ospray {
   namespace dw {
@@ -38,6 +44,7 @@ namespace ospray {
       struct DistributedFrameBuffer : public ospray::DistributedFrameBuffer
       {
         DistributedFrameBuffer(const vec2i &numPixels,
+
                                ObjectHandle myHandle,
                                ColorBufferFormat format,
                                uint32_t channels,
@@ -45,6 +52,12 @@ namespace ospray {
         ~DistributedFrameBuffer() override;
         void scheduleProcessing(
             const std::shared_ptr<mpicommon::Message> &message) override;
+        template <typename ColorT>
+        void processMessage(MasterTileMessage_FB<ColorT> *msg);
+
+        void closeCurrentFrame() override;
+
+        Buffer _buffer;
       };
 
     }  // namespace farm

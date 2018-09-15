@@ -42,7 +42,7 @@ ospray_create_library(ospray_module_dwdisplay dw_display_init.cpp Device.cpp
 		ospray_mpi_common
 		ospray_module_mpi
 		ospray_module_dwcommon ospray_module_ispc
-		${GLFW_LIBRARY} ${OPENGL_LIBRARIES})
+		${GLFW_LIBRARIES} glfw ${OPENGL_LIBRARIES})
 
 
 message(STATUS ${GLFW_LIBRARIES})

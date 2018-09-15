@@ -37,187 +37,185 @@
 
 ospray::dw::display::Device::~Device() {}
 
-void ospray::dw::display::Device::initializeDevice()
-{
-  ospray::api::Device::commit();
+void ospray::dw::display::Device::initializeDevice() {
+    ospray::api::Device::commit();
 
-  initialized = true;
+    initialized = true;
 
-  display::registerOSPWorkItems(workRegistry);
+    display::registerOSPWorkItems(workRegistry);
 
-  int _ac           = 2;
-  const char *_av[] = {"ospray_mpi_worker", "--osp:mpi"};
+    int _ac = 2;
+    const char *_av[] = {"ospray_mpi_worker", "--osp:mpi"};
 
-  std::string mode = getParam<std::string>("mpiMode", "mpi");
+    std::string mode = getParam<std::string>("mpiMode", "mpi");
 
-  mpicommon::init(&_ac, _av, true);
+    mpicommon::init(&_ac, _av, true);
 
-  postStatusMsg(OSPRAY_MPI_VERBOSE_LEVEL)
-      << "#o: initMPI::OSPonRanks: " << mpicommon::world.rank << '/'
-      << mpicommon::world.size;
+    postStatusMsg(OSPRAY_MPI_VERBOSE_LEVEL)
+            << "#o: initMPI::OSPonRanks: " << mpicommon::world.rank << '/'
+            << mpicommon::world.size;
 
-  MPI_CALL(Barrier(mpicommon::world.comm));
+    MPI_CALL(Barrier(mpicommon::world.comm));
 
-  // ospray::mpi::throwIfNotMpiParallel();
+    // ospray::mpi::throwIfNotMpiParallel();
 
-  if (mpicommon::IamTheMaster())
-    ospray::mpi::setupMaster();
-  else {
-    ospray::mpi::setupWorker();
-  }
-
-  if (mpicommon::world.size != 1) {
-    if (mpicommon::world.rank < 0) {
-      throw std::runtime_error(
-          "OSPRay MPI startup error. Use \"mpirun "
-          "-n 1 <command>\" when calling an "
-          "application that tries to spawn to start "
-          "the application you were trying to "
-          "start.");
+    if (mpicommon::IamTheMaster())
+        ospray::mpi::setupMaster();
+    else {
+        ospray::mpi::setupWorker();
     }
-  }
 
-  /* set up fabric and stuff - by now all the communicators should
-     be properly set up */
-  mpiFabric =
-      make_unique<mpicommon::MPIBcastFabric>(mpicommon::worker, MPI_ROOT, 0);
-  readStream  = make_unique<networking::BufferedReadStream>(*mpiFabric);
-  writeStream = make_unique<networking::BufferedWriteStream>(*mpiFabric);
+    if (mpicommon::world.size != 1) {
+        if (mpicommon::world.rank < 0) {
+            throw std::runtime_error(
+                    "OSPRay MPI startup error. Use \"mpirun "
+                    "-n 1 <command>\" when calling an "
+                    "application that tries to spawn to start "
+                    "the application you were trying to "
+                    "start.");
+        }
+    }
+
+    /* set up fabric and stuff - by now all the communicators should
+       be properly set up */
+    mpiFabric =
+            make_unique<mpicommon::MPIBcastFabric>(mpicommon::worker, MPI_ROOT, 0);
+    readStream = make_unique<networking::BufferedReadStream>(*mpiFabric);
+    writeStream = make_unique<networking::BufferedWriteStream>(*mpiFabric);
 }
 
-void ospray::dw::display::Device::commit()
-{
-  if (!initialized) {
-    initializeDevice();
-    if (mpicommon::IamAWorker())
-      dw::glDisplay::init(vec2i(512, 512));
-    wc = new wallconfig();
-    if (mpicommon::IamAWorker()) {
-      std::thread t([&] { ospray::mpi::runWorker(workRegistry); });
-      dw::glDisplay::start(wc->screenID);
-    }
-  }
-
-  if (!tcp_initialized) {
-    tcp_initialized = true;
-
-    auto DW_START_SERVER =
-        (utility::getEnvVar<int>("DW_START_SERVER").value_or(0) == 1);
-
-    auto DW_HOSTNAME = utility::getEnvVar<std::string>("DW_HOSTNAME")
-                           .value_or(std::string("localhost"));
-
-    auto DW_HOSTPORT = utility::getEnvVar<int>("DW_HOSTPORT").value_or(4444);
-    std::cout << "Waiting farm connection on : " << DW_HOSTNAME << ":"
-              << DW_HOSTPORT << std::endl;
-
-    if (DW_START_SERVER)
-      std::cout << "Waiting for connection on " << DW_HOSTNAME << ":"
-                << DW_HOSTPORT << std::endl;
-    else
-      std::cout << "Trying to connect to " << DW_HOSTNAME << ":" << DW_HOSTPORT
-                << std::endl;
-
-    try {
-      tcpFabric = make_unique<mpicommon::TCPFabric>(
-          DW_HOSTNAME, DW_HOSTPORT, DW_START_SERVER);
-      tcpreadStream  = make_unique<networking::BufferedReadStream>(*tcpFabric);
-      tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
-    } catch (std::exception ex) {
-      std::cerr << "Unable to connect to farm " << DW_HOSTNAME << ":"
-                << DW_HOSTPORT << std::endl;
+void ospray::dw::display::Device::commit() {
+    if (!initialized) {
+        initializeDevice();
+        if (mpicommon::IamAWorker())
+            dw::glDisplay::init(vec2i(512, 512));
+        wc = new wallconfig();
+        if (mpicommon::IamAWorker()) {
+            std::thread t([&] { ospray::mpi::runWorker(workRegistry); });
+            dw::glDisplay::start(wc->screenID);
+        }
     }
 
-    std::cout << "Connected [" << TILE_SIZE <<"]" << std::endl;
-  }
+    if (!tcp_initialized) {
+        tcp_initialized = true;
 
-  auto OSPRAY_DYNAMIC_LOADBALANCER =
-      utility::getEnvVar<int>("OSPRAY_DYNAMIC_LOADBALANCER");
+        auto DW_START_SERVER =
+                (utility::getEnvVar<int>("DW_START_SERVER").value_or(0) == 1);
 
-  auto useDynamicLoadBalancer = getParam<int>(
-      "dynamicLoadBalancer", OSPRAY_DYNAMIC_LOADBALANCER.value_or(false));
+        auto DW_HOSTNAME = utility::getEnvVar<std::string>("DW_HOSTNAME")
+                .value_or(std::string("localhost"));
 
-  auto OSPRAY_PREALLOCATED_TILES =
-      utility::getEnvVar<int>("OSPRAY_PREALLOCATED_TILES");
+        auto DW_HOSTPORT = utility::getEnvVar<int>("DW_HOSTPORT").value_or(4444);
+        std::cout << "Waiting farm connection on : " << DW_HOSTNAME << ":"
+                  << DW_HOSTPORT << std::endl;
 
-  auto preAllocatedTiles =
-      OSPRAY_PREALLOCATED_TILES.value_or(getParam<int>("preAllocatedTiles", 4));
+        if (DW_START_SERVER)
+            std::cout << "Waiting for connection on " << DW_HOSTNAME << ":"
+                      << DW_HOSTPORT << std::endl;
+        else
+            std::cout << "Trying to connect to " << DW_HOSTNAME << ":" << DW_HOSTPORT
+                      << std::endl;
 
-  mpi::work::SetLoadBalancer slbWork(
-      ObjectHandle(), useDynamicLoadBalancer, preAllocatedTiles);
+        try {
+            tcpFabric = make_unique<mpicommon::TCPFabric>(
+                    DW_HOSTNAME, DW_HOSTPORT, DW_START_SERVER);
+            tcpreadStream = make_unique<networking::BufferedReadStream>(*tcpFabric);
+            tcpwriteStream = make_unique<networking::BufferedWriteStream>(*tcpFabric);
+        } catch (std::exception ex) {
+            std::cerr << "Unable to connect to farm " << DW_HOSTNAME << ":"
+                      << DW_HOSTPORT << std::endl;
+        }
 
-  processWork(slbWork);
+        std::cout << "Connected [" << TILE_SIZE << "]" << std::endl;
+    }
+
+    auto OSPRAY_DYNAMIC_LOADBALANCER =
+            utility::getEnvVar<int>("OSPRAY_DYNAMIC_LOADBALANCER");
+
+    auto useDynamicLoadBalancer = getParam<int>(
+            "dynamicLoadBalancer", OSPRAY_DYNAMIC_LOADBALANCER.value_or(false));
+
+    auto OSPRAY_PREALLOCATED_TILES =
+            utility::getEnvVar<int>("OSPRAY_PREALLOCATED_TILES");
+
+    auto preAllocatedTiles =
+            OSPRAY_PREALLOCATED_TILES.value_or(getParam<int>("preAllocatedTiles", 4));
+
+    mpi::work::SetLoadBalancer slbWork(
+            ObjectHandle(), useDynamicLoadBalancer, preAllocatedTiles);
+
+    processWork(slbWork);
 }
 
 void ospray::dw::display::Device::processWork(mpi::work::Work &work,
-                                              bool flushWriteStream)
-{
-  auto tag = typeIdOf(work);
-  tcpwriteStream->write(&tag, sizeof(tag));
-  work.serialize(*tcpwriteStream);
-  tcpwriteStream->flush();
-  if (tag != typeIdOf(display::CreateFrameBuffer()) &&
-      (tag != typeIdOf(mpi::work::RenderFrame()))) {
-    work.runOnMaster();
-  }
+                                              bool flushWriteStream) {
+    auto tag = typeIdOf(work);
+    tcpwriteStream->write(&tag, sizeof(tag));
+    work.serialize(*tcpwriteStream);
+    tcpwriteStream->flush();
+    if (tag != typeIdOf(display::CreateFrameBuffer()) &&
+        (tag != typeIdOf(mpi::work::RenderFrame()))) {
+        work.runOnMaster();
+    }
 }
 
 OSPFrameBuffer ospray::dw::display::Device::frameBufferCreate(
-    const ospcommon::vec2i &size,
-    const OSPFrameBufferFormat mode,
-    const ospray::uint32 channels)
-{
-  ObjectHandle handle = allocateHandle();
+        const ospcommon::vec2i &size,
+        const OSPFrameBufferFormat mode,
+        const ospray::uint32 channels) {
+    ObjectHandle handle = allocateHandle();
 
-  display::CreateFrameBuffer tcpwork(
-      handle, wc->completeScreeen, mode, channels);
-  processWork(tcpwork);
+    display::CreateFrameBuffer tcpwork(
+            handle, wc->completeScreeen, mode, channels);
+    processWork(tcpwork);
 
-  display::CreateFrameBuffer work(handle, size, mode, channels);
-  auto tag = typeIdOf(work);
-  writeStream->write(&tag, sizeof(tag));
-  work.serialize(*writeStream);
-  writeStream->flush();
-  work.runOnMaster();
-  return (OSPFrameBuffer)(int64)handle;
+//#ifdef __APPLE__
+//    display::CreateFrameBuffer work(handle, wc->completeScreeen, mode, channels);
+//#else
+    display::CreateFrameBuffer work(handle, size, mode, channels);
+//#endif
+    auto tag = typeIdOf(work);
+    writeStream->write(&tag, sizeof(tag));
+    work.serialize(*writeStream);
+    writeStream->flush();
+    work.runOnMaster();
+    return (OSPFrameBuffer) (int64) handle;
 }
 
 float ospray::dw::display::Device::renderFrame(
-    OSPFrameBuffer _fb,
-    OSPRenderer _renderer,
-    const ospray::uint32 fbChannelFlags)
-{
-  mpi::work::RenderFrame work(_fb, _renderer, fbChannelFlags);
-  processWork(work, true);
+        OSPFrameBuffer _fb,
+        OSPRenderer _renderer,
+        const ospray::uint32 fbChannelFlags) {
+    mpi::work::RenderFrame work(_fb, _renderer, fbChannelFlags);
+    processWork(work, true);
 
-  display::RenderFrame localrender(_fb, _renderer, fbChannelFlags);
-  auto tag = typeIdOf(localrender);
-  writeStream->write(&tag, sizeof(tag));
-  localrender.serialize(*writeStream);
-  writeStream->flush();
-  localrender.runOnMaster();
-  return localrender.varianceResult;
+    display::RenderFrame localrender(_fb, _renderer, fbChannelFlags);
+    auto tag = typeIdOf(localrender);
+    writeStream->write(&tag, sizeof(tag));
+    localrender.serialize(*writeStream);
+    writeStream->flush();
+    localrender.runOnMaster();
+    return localrender.varianceResult;
 }
 
-std::unique_ptr<ospray::mpi::work::Work> ospray::dw::display::Device::readWork()
-{
-  auto work = ospray::mpi::readWork(workRegistry, *tcpreadStream);
-  return std::move(work);
+std::unique_ptr<ospray::mpi::work::Work> ospray::dw::display::Device::readWork() {
+    auto work = ospray::mpi::readWork(workRegistry, *tcpreadStream);
+    return std::move(work);
 }
 
 std::unique_ptr<ospray::mpi::work::Work>
-ospray::dw::display::Device::readTileWork()
-{
-  if (!((mpicommon::TCPFabric *)tcpFabric.get())->hasData())
-    return nullptr;
-  auto work = ospray::mpi::readWork(workRegistry, *tcpreadStream);
+ospray::dw::display::Device::readTileWork() {
+    if (!((mpicommon::TCPFabric *) tcpFabric.get())->hasData())
+        return nullptr;
+    auto work = ospray::mpi::readWork(workRegistry, *tcpreadStream);
 
-  auto tag = typeIdOf(work);
-  if (tag != typeIdOf<dw::display::SetTile>())
-    throw std::runtime_error("Somthing went wrong it can only be a tile");
+    auto tag = typeIdOf(work);
+    if (tag != typeIdOf<dw::display::SetTile>())
+        throw std::runtime_error("Somthing went wrong it can only be a tile");
 
-  return std::move(work);
+    return std::move(work);
 }
 
 OSP_REGISTER_DEVICE(ospray::dw::display::Device, dwdisplay);
+
 OSP_REGISTER_DEVICE(ospray::dw::display::Device, display);

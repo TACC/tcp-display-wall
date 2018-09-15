@@ -26,8 +26,17 @@
    @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
  */
 #include "FarmFramebuffer.h"
-#include <future>
+
+#include <modules/mpi/DistributedFrameBuffer_ispc.h>
+#include "mpi/fb/DistributedFrameBuffer.h"
+#include "mpi/fb/DistributedFrameBuffer_TileTypes.h"
+
+#include "ospcommon/tasking/parallel_for.h"
+#include "ospcommon/tasking/schedule.h"
+#include "../../common/work/DWwork.h"
+
 #include <common/work/DWwork.h>
+#include <future>
 
 static std::atomic<int> count{0};
 
@@ -37,25 +46,71 @@ ospray::dw::farm::DistributedFrameBuffer::DistributedFrameBuffer(
     ospray::FrameBuffer::ColorBufferFormat format,
     uint32_t channels,
     bool masterIsAWorker)
-    : ospray::DistributedFrameBuffer(numPixels,
-                                     myHandle,
-                                     format,
-                                     channels,
-                                     masterIsAWorker)
+    : ospray::DistributedFrameBuffer(
+          numPixels, myHandle, format, channels, masterIsAWorker)
 {
-
 }
 ospray::dw::farm::DistributedFrameBuffer::~DistributedFrameBuffer() {}
 
 void ospray::dw::farm::DistributedFrameBuffer::scheduleProcessing(
     const std::shared_ptr<mpicommon::Message> &message)
 {
-  std::future<void> t = std::async([&] {
-        SetTile tile(myId, message->size, message->data);
-        auto device = std::dynamic_pointer_cast<ospray::dw::farm::Device>(
-                ospray::api::Device::current);
-        assert(device);
-        device->sendWorkDisplayWall(tile, true);
+
+  {
+    std::lock_guard<std::mutex> lock(_buffer._m);
+
+    auto start = std::chrono::steady_clock::now();
+
+    if (_buffer.size() == DW_SEND_BUFFER_SIZE) {
+      SetTile tile(myId, _buffer.buffersize(), _buffer.encode().get());
+      auto device = std::dynamic_pointer_cast<ospray::dw::farm::Device>(
+              ospray::api::Device::current);
+      assert(device);
+      device->sendWorkDisplayWall(tile, true);
+      _buffer.clear();
+    }
+    _buffer.addTile(message);
+  }
+  auto *msg = (TileMessage *)message->data;
+
+  tasking::schedule([=]() {
+    if (msg->command & MASTER_WRITE_TILE_I8) {
+      processMessage((MasterTileMessage_RGBA_I8 *)msg);
+      return;
+    } else if (msg->command & MASTER_WRITE_TILE_F32) {
+      processMessage((MasterTileMessage_RGBA_F32 *)msg);
+      return;
+    } else {
+      DistributedFrameBuffer::scheduleProcessing(message);
+    }
   });
-  ospray::DistributedFrameBuffer::scheduleProcessing(message);
+}
+
+template <typename ColorT>
+void ospray::dw::farm::DistributedFrameBuffer::processMessage(
+    ospray::MasterTileMessage_FB<ColorT> *msg)
+{
+  if (hasVarianceBuffer) {
+    const vec2i tileID = msg->coords / TILE_SIZE;
+    if (msg->error < (float)inf)
+      tileErrorRegion.update(tileID, msg->error);
+  }
+  // Finally, tell the master that this tile is done
+  auto *tileDesc = this->getTileDescFor(msg->coords);
+  TileData *td   = (TileData *)tileDesc;
+  this->finalizeTileOnMaster(td);
+}
+
+void ospray::dw::farm::DistributedFrameBuffer::closeCurrentFrame()
+{
+  if(mpicommon::IamTheMaster()) {
+    std::lock_guard<std::mutex> lock(_buffer._m);
+    SetTile tile(myId, _buffer.buffersize(), _buffer.encode().get());
+    auto device = std::dynamic_pointer_cast<ospray::dw::farm::Device>(
+        ospray::api::Device::current);
+    assert(device);
+    device->sendWorkDisplayWall(tile, true);
+    _buffer.clear();
+  }
+  ospray::DistributedFrameBuffer::closeCurrentFrame();
 }

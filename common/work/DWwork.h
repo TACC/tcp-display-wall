@@ -30,15 +30,91 @@
 
 #include <mpi/common/OSPWork.h>
 #include <ospray/fb/FrameBuffer.h>
-
 #include <memory>
+
+#include <chrono>
 
 namespace ospray {
   namespace dw {
 
+    struct Buffer
+    {
+      std::vector<std::shared_ptr<byte_t>> _buffer_data;
+      std::vector<size_t> _buffer_size;
+
+      std::mutex _m;
+
+      Buffer() {}
+
+
+      size_t size() { return _buffer_size.size();}
+      size_t clear() { _buffer_size.clear(), _buffer_data.clear(); }
+
+      void addTile(const std::shared_ptr<mpicommon::Message> &msg)
+      {
+//        std::unique_lock<std::mutex> lock(_m);
+        _buffer_size.push_back(msg->size);
+        std::shared_ptr<byte_t> tile((byte_t*)std::malloc(msg->size));
+        std::memcpy(tile.get(), msg->data, msg->size);
+        _buffer_data.push_back(tile);
+      }
+
+      size_t buffersize() const
+      {
+        size_t sum = sizeof(size_t);
+        for (auto &m : _buffer_size)
+          sum += (sizeof(size_t) + m);
+        return sum;
+      }
+
+      std::shared_ptr<byte_t> encode()
+      {
+//        std::unique_lock<std::mutex> lock(_m);
+        std::shared_ptr<byte_t> buf((byte_t*)malloc(buffersize()));
+        byte_t *pos    = buf.get();
+        *(size_t *)pos = _buffer_data.size();
+        pos += sizeof(size_t);
+        std::memcpy(
+            pos, _buffer_size.data(), sizeof(size_t) * _buffer_size.size());
+        pos += sizeof(size_t) * _buffer_size.size();
+
+        int p = 0;
+        for (auto &m : _buffer_data) {
+          std::memcpy(pos, m.get(), _buffer_size[p++]);
+          pos += _buffer_size[p-1];
+        }
+        return buf;
+      }
+
+      void decode(byte_t* ptr)
+      {
+
+        size_t size = *(size_t *)ptr;
+        ptr += sizeof(size_t);
+
+        _buffer_data.clear();
+        _buffer_size.resize(size);
+
+        std::memcpy(_buffer_size.data(), ptr, sizeof(size_t) * size);
+
+        ptr += sizeof(size_t) * size;
+
+        for(auto& s : _buffer_size) {
+          std::shared_ptr<byte_t> tile((byte_t*)std::malloc(s));
+          std::memcpy(tile.get(),ptr,s);
+          _buffer_data.push_back(tile);
+          ptr += s;
+        }
+
+      }
+    };
+
+
+
     struct SetTile : public mpi::work::Work
     {
-      SetTile() = default;
+      SetTile() {
+      }
 
       SetTile(ospray::ObjectHandle &handle,
               const uint64 &size,

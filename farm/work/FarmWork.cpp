@@ -34,9 +34,6 @@ void ospray::dw::farm::CreateFrameBuffer::run()
 }
 void ospray::dw::farm::CreateFrameBuffer::runOnMaster()
 {
-  const bool hasDepthBuffer    = channels & OSP_FB_DEPTH;
-  const bool hasAccumBuffer    = channels & OSP_FB_ACCUM;
-  const bool hasVarianceBuffer = channels & OSP_FB_VARIANCE;
 
   assert(dimensions.x > 0);
   assert(dimensions.y > 0);
@@ -44,7 +41,7 @@ void ospray::dw::farm::CreateFrameBuffer::runOnMaster()
   FrameBuffer *fb =
       new ospray::dw::farm::DistributedFrameBuffer(dimensions,
                                                    handle,
-                                                   format,
+                                                   OSP_FB_NONE,
                                                    channels);
 
   handle.assign(fb);

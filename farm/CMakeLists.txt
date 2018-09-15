@@ -26,7 +26,13 @@
 #   @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
 #*/
 
+
+    SET(DW_SEND_BUFFER_SIZE 64 CACHE STRING "Number of tiles in send buffer")
+    SET_PROPERTY(CACHE DW_SEND_BUFFER_SIZE PROPERTY STRINGS 8 16 32 64 128 256 512)
+
     include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+    add_definitions(-DDW_SEND_BUFFER_SIZE=${DW_SEND_BUFFER_SIZE})
 
     ospray_create_library(ospray_module_dwfarm
             dw_farm_init.cpp

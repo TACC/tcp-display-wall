@@ -125,13 +125,17 @@ namespace ospray {
           throw std::runtime_error("Unknown type");
         }
 
+        template <OSPFrameBufferFormat FBType>
+        inline void accum(const vec2i &coords, const unsigned int *tile)
+        {
+          throw std::runtime_error("Unknown type");
+        }
+
         void createTiles();
 
         std::set<int> diff();
 
-       protected:
-
-
+       public:
         std::mutex done;
         std::condition_variable condition_done;
         std::atomic<bool> frameActive{false};
@@ -147,7 +151,6 @@ namespace ospray {
         std::set<int> tilesMissing;
 
         vec2i maxTiles;
-
       };
 
       template <>
@@ -160,15 +163,62 @@ namespace ospray {
       }
 
       template <>
+      inline void DisplayFramebuffer::accum<OSP_FB_RGBA8>(
+          const vec2i &coords, const unsigned int *buffer)
+      {
+        uint32 *color  = (uint32 *)colorBuffer;
+        uint32 *pixels = (uint32 *)buffer;
+
+        tasking::parallel_for(TILE_SIZE, [&](const int iy) {
+          int y = ((coords.y * ratio.y + (iy * ratio.y)) - pos.y);
+          if (y < 0 || y >= size.y)
+            return;
+          for (int ix = 0; ix < TILE_SIZE; ix++) {
+            int x = ((coords.x * ratio.y + (ix * ratio.y)) - pos.x);
+            if (x < 0 || x >= size.x)
+              continue;
+            color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+          }
+        });
+
+        setNumTilesDone(coords);
+      }
+
+      template <>
+      inline void DisplayFramebuffer::accum<OSP_FB_RGBA32F>(
+          const vec2i &coords, const unsigned int *buffer)
+      {
+        // throw std::runtime_error("Unknown type");
+
+        vec4f *color  = (vec4f *)colorBuffer;
+        vec4f *pixels = (vec4f *)buffer;
+
+        tasking::parallel_for(TILE_SIZE, [&](const int iy) {
+          int y = ((coords.y * ratio.y + (iy * ratio.y)) - pos.y);
+          if (y < 0 || y >= size.y)
+            return;
+          for (int ix = 0; ix < TILE_SIZE; ix++) {
+            int x = ((coords.x * ratio.y + (ix * ratio.y)) - pos.x);
+            if (x < 0 || x >= size.x)
+              continue;
+            color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
+          }
+        });
+
+
+        setNumTilesDone(coords);
+      }
+
+      template <>
       inline void DisplayFramebuffer::accum(
           ospray::dw::display::TilePixels<OSP_FB_RGBA8> *tile)
       {
         if (!colorBufferFormat & OSP_FB_RGBA8)
           throw std::runtime_error("Incompatible buffer formats");
-        uint32 *color = (uint32 *) colorBuffer;
-        uint32 *pixels = (uint32 *) tile->finaltile;
+        uint32 *color  = (uint32 *)colorBuffer;
+        uint32 *pixels = (uint32 *)tile->finaltile;
 
-        if(mpicommon::IamAWorker()) {
+        if (mpicommon::IamAWorker()) {
           tasking::parallel_for(TILE_SIZE, [&](const int iy) {
             int y = ((tile->coords.y + iy) - pos.y);
             if (y < 0 || y >= size.y)
@@ -180,23 +230,9 @@ namespace ospray {
               color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
             }
           });
-
+          setNumTilesDone(tile->coords);
         } else {
-          int tsize_y =  int(1 / ratio.y);
-          int tsize_x =  int(1 / ratio.x);
-          for(int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
-            int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
-            if (y < 0 || y >= size.y)
-              continue;
-            for (int ix = 0; ix < TILE_SIZE; ix += tsize_x) {
-              int x = ((tile->coords.x + ix) - pos.x) * ratio.x;
-              if (x < 0 || x >= size.x)
-                continue;
-              color[y * size.x + x] = pixels[iy * TILE_SIZE + ix];
-            }
-          }
         }
-        setNumTilesDone(tile->coords);
       }
 
       template <>
@@ -207,7 +243,7 @@ namespace ospray {
           throw std::runtime_error("Incompatible buffer formats");
         vec4f *color  = (vec4f *)colorBuffer;
         vec4f *pixels = (vec4f *)tile->finaltile;
-        if(mpicommon::IamAWorker()) {
+        if (mpicommon::IamAWorker()) {
           tasking::parallel_for(TILE_SIZE, [&](const int iy) {
             int y = ((tile->coords.y + iy) - pos.y);
             if (y < 0 || y >= size.y)
@@ -221,9 +257,9 @@ namespace ospray {
           });
 
         } else {
-          int tsize_y =  int(1 / ratio.y);
-          int tsize_x =  int(1 / ratio.x);
-          for(int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
+          int tsize_y = int(1 / ratio.y);
+          int tsize_x = int(1 / ratio.x);
+          for (int iy = 0; iy < TILE_SIZE; iy += tsize_y) {
             int y = ((tile->coords.y + iy) - pos.y) * ratio.y;
             if (y < 0 || y >= size.y)
               continue;

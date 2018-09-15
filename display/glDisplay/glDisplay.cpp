@@ -27,7 +27,15 @@
  */
 
 #include "glDisplay.h"
+
+#ifndef __APPLE__
 #include <GL/gl.h>
+#else
+
+#include <OpenGL/gl.h>
+
+#endif
+
 #include "ospcommon/utility/getEnvVar.h"
 
 namespace ospray {
@@ -91,16 +99,6 @@ namespace ospray {
 
             vec2i wsize = size;
 
-//      if (FULLSCREEN) {
-//        const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-//        glfwWindowHint(GLFW_RED_BITS, mode->redBits);
-//        glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
-//        glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
-//        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-//
-//        wsize.x = 1920; //mode->width;
-//        wsize.y = 1080; //mode->height;
-//      }
             window =
                     glfwCreateWindow(wsize.x,
                                      wsize.y,
