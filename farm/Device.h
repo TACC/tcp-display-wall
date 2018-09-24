@@ -45,7 +45,7 @@ namespace ospray {
         mpi::work::WorkTypeRegistry &getWorkRegistry();
 
        protected:
-        void initializeDevice() override;
+        void initializeDevice();
         std::unique_ptr<networking::Fabric> tcpFabric{nullptr};
         std::unique_ptr<networking::ReadStream> tcpreadStream{nullptr};
         std::unique_ptr<networking::WriteStream> tcpwriteStream{nullptr};
