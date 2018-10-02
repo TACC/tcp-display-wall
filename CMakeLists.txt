@@ -52,7 +52,7 @@ IF(OSPRAY_MODULE_DISPLAYWALL)
 
     add_subdirectory(common)
     add_subdirectory(farm)
-    add_subdirectory(display)
+    add_subdirectory(mpidisplay)
 
 
 ENDIF(OSPRAY_MODULE_DISPLAYWALL)

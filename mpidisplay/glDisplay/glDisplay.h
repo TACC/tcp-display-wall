@@ -34,7 +34,7 @@
 #include <memory>
 #include <thread>
 
-#include <display/fb/DisplayFramebuffer.h>
+#include <mpidisplay/fb/DisplayFramebuffer.h>
 
 namespace ospray {
     namespace dw {

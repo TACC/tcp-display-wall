@@ -27,12 +27,12 @@
  */
 
 #include "Device.h"
-#include <display/work/OSPWork.h>
+#include <mpidisplay/work/OSPWork.h>
 #include <mpi/MPOffloadWorker.h>
 #include <mpi/common/setup.h>
 #include "ospcommon/utility/getEnvVar.h"
 
-#include <display/glDisplay/glDisplay.h>
+#include <mpidisplay/glDisplay/glDisplay.h>
 #include <farm/fb/FarmFramebuffer.h>
 
 ospray::dw::display::Device::~Device() {}

@@ -26,9 +26,9 @@
    @author Joao Barbosa <jbarbosa@tacc.utexas.edu>
  */
 #include "OSPWork.h"
-#include <display/Device.h>
-#include <display/fb/DisplayFramebuffer.h>
-#include <display/glDisplay/glDisplay.h>
+#include <mpidisplay/Device.h>
+#include <mpidisplay/fb/DisplayFramebuffer.h>
+#include <mpidisplay/glDisplay/glDisplay.h>
 #include <mpi/fb/DistributedFrameBuffer.h>
 #include <future>
 

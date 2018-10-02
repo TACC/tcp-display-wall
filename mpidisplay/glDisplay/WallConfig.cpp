@@ -28,7 +28,7 @@
 #include <fstream>
 #include <iostream>
 
-#include <display/glDisplay/glDisplay.h>
+#include <mpidisplay/glDisplay/glDisplay.h>
 #include "WallConfig.h"
 #include "ospcommon/utility/getEnvVar.h"
 

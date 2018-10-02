@@ -29,7 +29,7 @@
 #define OSPRAY_DISPLAY_DEVICE_H
 
 #include <common/networking/TCPFabric.h>
-#include <display/glDisplay/WallConfig.h>
+#include <mpidisplay/glDisplay/WallConfig.h>
 #include <mpi/MPIOffloadDevice.h>
 #include <mpi/common/OSPWork.h>
 
